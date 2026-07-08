@@ -1,0 +1,1 @@
+- [Turn-based battle state cloning](game-battle-state-cloning.md) — R3F/zustand game battles must clone enemy instances before mutating stats, or battle state corrupts shared world-state objects.

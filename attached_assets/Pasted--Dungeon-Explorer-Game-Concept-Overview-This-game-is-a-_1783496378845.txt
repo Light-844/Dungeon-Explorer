@@ -1,0 +1,328 @@
+# Dungeon Explorer - Game Concept
+
+## Overview
+
+This game is a top-down dungeon exploration RPG that combines 2D gameplay with 3D environments, creating a classic adventure feel with modern visuals. Players explore randomly generated dungeons filled with dangerous monsters, hidden treasures, puzzles, and secrets. Every dungeon offers a unique layout, ensuring that no two adventures are exactly the same.
+
+The core gameplay is divided into two parts:
+
+* **Real-time dungeon exploration**
+* **Turn-based RPG battles**
+
+As players venture deeper into each dungeon, enemies become stronger, treasures become more valuable, and survival becomes increasingly challenging.
+
+## World and Setting
+
+The world is filled with ancient underground labyrinths that were once home to forgotten civilizations. These dungeons contain magical relics, powerful weapons, rare artifacts, and dangerous monsters guarding their treasures.
+
+Each dungeon has its own unique appearance and theme, such as:
+
+* Moss-covered ruins
+* Crystal caves
+* Haunted crypts
+* Ancient temples
+* Lava caverns
+* Frozen catacombs
+* Abandoned castles
+* Underground forests
+
+Every dungeon tells its own story through its environment, enemies, and hidden secrets.
+
+## Exploration
+
+Players control a hero from a top-down perspective while moving through maze-like dungeon floors.
+
+During exploration players can:
+
+* Walk through winding corridors
+* Open treasure chests
+* Discover hidden rooms
+* Solve environmental puzzles
+* Find secret passages
+* Avoid traps
+* Collect crafting materials
+* Gather healing items
+* Pick up weapons and armor
+* Activate switches to unlock new areas
+* Find NPCs or merchants hidden inside the dungeon
+
+Some doors remain locked until players find keys, defeat powerful enemies, or solve puzzles.
+
+The deeper players explore, the more dangerous the dungeon becomes.
+
+## Random Dungeon Generation
+
+Every dungeon is procedurally generated.
+
+Randomized features include:
+
+* Room layouts
+* Hallways
+* Treasure locations
+* Enemy placements
+* Trap positions
+* Secret rooms
+* Puzzle rooms
+* Mini-boss encounters
+* Shop rooms
+* Rare event rooms
+
+This gives every playthrough a fresh experience and encourages exploration.
+
+## Combat
+
+When the player encounters an enemy, exploration transitions into a turn-based RPG battle.
+
+Battles take place on a separate combat screen where players take turns with enemies.
+
+Players can choose actions such as:
+
+* Attack
+* Use Skills
+* Cast Magic
+* Defend
+* Use Items
+* Change Equipment
+* Escape (when possible)
+
+Each character has statistics including:
+
+* HP (Health)
+* MP (Magic)
+* Attack
+* Defense
+* Magic Attack
+* Magic Defense
+* Speed
+* Luck
+
+Turn order depends on the Speed stat.
+
+## Skills
+
+Players unlock new skills by leveling up, discovering ancient tomes, or equipping special weapons.
+
+Examples include:
+
+Sword Skills
+
+* Power Slash
+* Double Strike
+* Whirlwind Attack
+
+Magic
+
+* Fireball
+* Ice Spear
+* Lightning Bolt
+* Earthquake
+* Healing Light
+
+Support Skills
+
+* Increase Attack
+* Increase Defense
+* Speed Boost
+* Poison Cure
+* Shield Barrier
+
+Advanced Skills
+
+* Critical Strike
+* Shadow Step
+* Meteor Storm
+* Divine Judgment
+
+Different enemies have different weaknesses, encouraging strategic skill use.
+
+## Items
+
+Items found while exploring become important during battle.
+
+Examples include:
+
+Healing
+
+* Small Potion
+* Large Potion
+* Revive Scroll
+
+Buffs
+
+* Strength Potion
+* Defense Potion
+* Speed Potion
+
+Attack Items
+
+* Fire Bomb
+* Ice Crystal
+* Poison Flask
+
+Special Items
+
+* Dungeon Keys
+* Treasure Maps
+* Teleport Scrolls
+* Magic Gems
+
+Managing limited supplies is an important part of surviving longer dungeon runs.
+
+## Equipment
+
+Players collect stronger equipment from treasure chests, bosses, merchants, or rare enemy drops.
+
+Equipment categories include:
+
+Weapons
+
+* Swords
+* Spears
+* Axes
+* Bows
+* Wands
+
+Armor
+
+* Helmets
+* Chest Armor
+* Gloves
+* Boots
+* Shields
+
+Accessories
+
+* Rings
+* Necklaces
+* Charms
+* Magic Relics
+
+Each piece of equipment changes the player's stats and may grant special abilities.
+
+## Treasure
+
+Treasure chests reward exploration and can contain:
+
+* Gold
+* Rare weapons
+* Armor
+* Magic scrolls
+* Skill books
+* Crafting materials
+* Keys
+* Consumable items
+* Legendary artifacts
+
+Some treasure chests are hidden behind puzzles or protected by powerful monsters.
+
+## Enemies
+
+Every dungeon contains different monsters suited to its theme.
+
+Examples include:
+
+Ancient Ruins
+
+* Skeleton Warriors
+* Stone Golems
+* Ghosts
+
+Crystal Cave
+
+* Crystal Spiders
+* Slimes
+* Bats
+
+Lava Dungeon
+
+* Fire Elementals
+* Lava Golems
+* Flame Lizards
+
+Frozen Cavern
+
+* Ice Wolves
+* Frost Spirits
+* Snow Golems
+
+Swamp
+
+* Giant Frogs
+* Poison Snakes
+* Mushroom Monsters
+
+Each monster has unique attack patterns, elemental strengths, and weaknesses.
+
+## Boss Battles
+
+Each dungeon ends with a challenging boss fight.
+
+Bosses feature:
+
+* Multiple combat phases
+* Powerful special attacks
+* Unique battle mechanics
+* Summoned minions
+* Elemental abilities
+
+Defeating a boss rewards players with rare equipment, large amounts of experience, and access to the next dungeon.
+
+## Progression
+
+Players grow stronger by:
+
+* Gaining experience
+* Leveling up
+* Learning new skills
+* Finding better equipment
+* Upgrading weapons
+* Crafting stronger gear
+* Unlocking passive abilities
+
+Each level improves the player's statistics and opens new strategic options.
+
+## Difficulty Progression
+
+Every new dungeon increases in difficulty.
+
+Enemies gain:
+
+* Higher health
+* Increased damage
+* Improved defenses
+* Smarter AI
+* New abilities
+* More dangerous status effects
+
+Higher difficulty dungeons also offer greater rewards.
+
+## Visual Style
+
+The game uses a hybrid 2D and 3D presentation.
+
+* 3D environments with lighting and shadows
+* 2D or stylized 3D characters viewed from above
+* Animated environmental effects
+* Glowing treasure chests
+* Magical spell effects
+* Atmospheric weather and fog
+* Dynamic lighting from torches and crystals
+
+This creates a nostalgic RPG feel while maintaining a modern visual presentation.
+
+## Replayability
+
+To keep every adventure exciting, the game includes:
+
+* Random dungeon layouts
+* Random loot
+* Rare hidden rooms
+* Secret bosses
+* Multiple character builds
+* Unlockable skills
+* Different equipment combinations
+* Increasing dungeon difficulty
+* Optional challenge modes
+* Legendary treasures with very low drop rates
+
+Every playthrough offers new discoveries, encouraging players to explore deeper and experiment with different strategies.
