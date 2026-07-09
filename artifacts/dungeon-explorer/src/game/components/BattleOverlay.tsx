@@ -46,7 +46,12 @@ export function BattleOverlay() {
               className="h-14 w-14 rounded-md sm:h-20 sm:w-20"
               style={{ backgroundColor: enemy.color, boxShadow: `0 0 24px ${enemy.color}55` }}
             />
-            <div className="font-serif text-sm font-semibold text-foreground">{enemy.name}</div>
+            <div className="flex items-center gap-1.5 font-serif text-sm font-semibold text-foreground">
+              <span>{enemy.name}</span>
+              <span className="rounded-full bg-black/40 px-1.5 py-0.5 text-[10px] font-sans font-normal text-muted-foreground">
+                Lv.{enemy.level}
+              </span>
+            </div>
             <div className="h-2 w-24 overflow-hidden rounded-full bg-black/40">
               <div
                 className="h-full rounded-full bg-destructive transition-all"

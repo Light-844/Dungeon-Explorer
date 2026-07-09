@@ -1,5 +1,6 @@
 import { useMemo, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useGameStore } from '../store';
 import type { DungeonLevel, Tile } from '../types';
@@ -88,18 +89,32 @@ function EnemyMarkers({ dungeon }: { dungeon: DungeonLevel }) {
         if (!pos) return null;
         const size = enemy.isBoss ? 0.85 : 0.5;
         return (
-          <mesh
-            key={enemy.instanceId}
-            position={[pos.x * TILE_SIZE, size / 2 + 0.1, pos.y * TILE_SIZE]}
-            castShadow
-          >
-            <boxGeometry args={[size, size, size]} />
-            <meshStandardMaterial
-              color={enemy.color}
-              emissive={enemy.color}
-              emissiveIntensity={enemy.isBoss ? 0.5 : 0.2}
-            />
-          </mesh>
+          <group key={enemy.instanceId} position={[pos.x * TILE_SIZE, 0, pos.y * TILE_SIZE]}>
+            <mesh position={[0, size / 2 + 0.1, 0]} castShadow>
+              <boxGeometry args={[size, size, size]} />
+              <meshStandardMaterial
+                color={enemy.color}
+                emissive={enemy.color}
+                emissiveIntensity={enemy.isBoss ? 0.5 : 0.2}
+              />
+            </mesh>
+            <Html position={[0, size + 0.45, 0]} center distanceFactor={8} zIndexRange={[10, 0]}>
+              <div
+                className={`pointer-events-none flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[9px] font-medium backdrop-blur-sm ${
+                  enemy.isBoss
+                    ? 'border-primary/60 bg-primary/20 text-primary-foreground'
+                    : 'border-white/15 bg-black/60 text-white'
+                }`}
+              >
+                <span
+                  className="inline-block h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: enemy.color }}
+                />
+                <span>{enemy.name}</span>
+                <span className="opacity-70">Lv.{enemy.level}</span>
+              </div>
+            </Html>
+          </group>
         );
       })}
     </group>
@@ -132,7 +147,13 @@ function PlayerToken() {
       meshRef.current.position.lerp(target.current, f);
       const targetAngle = FACING_ANGLE[facing] ?? 0;
       const rotFactor = smoothFactor(10, delta);
-      meshRef.current.rotation.y += (targetAngle - meshRef.current.rotation.y) * rotFactor;
+      // Shortest-arc angular delta, wrapped into (-PI, PI], so turning e.g.
+      // right -> up takes the short 90 degree turn instead of spinning the
+      // long way around when the raw angles straddle the +-PI seam.
+      let angleDelta = (targetAngle - meshRef.current.rotation.y) % (Math.PI * 2);
+      if (angleDelta > Math.PI) angleDelta -= Math.PI * 2;
+      if (angleDelta < -Math.PI) angleDelta += Math.PI * 2;
+      meshRef.current.rotation.y += angleDelta * rotFactor;
     }
   });
 

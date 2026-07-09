@@ -107,6 +107,8 @@ export interface EnemyInstance extends EnemyTemplate {
   instanceId: string;
   stats: Stats;
   defending: boolean;
+  /** Display level, derived from the dungeon floor the enemy spawned on. */
+  level: number;
 }
 
 export interface DungeonTheme {

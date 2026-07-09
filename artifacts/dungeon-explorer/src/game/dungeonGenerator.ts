@@ -98,6 +98,7 @@ function spawnEnemy(
     instanceId: `${enemyId}-${Math.random().toString(36).slice(2, 9)}`,
     stats,
     defending: false,
+    level: floor,
   };
 }
 
