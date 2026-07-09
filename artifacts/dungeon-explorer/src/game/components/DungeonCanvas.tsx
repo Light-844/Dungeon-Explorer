@@ -145,18 +145,30 @@ function PlayerToken() {
 }
 
 function CameraRig() {
-  const smoothedY = useRef<number | null>(null);
+  // The camera itself is smoothed, but if the look-at point snaps straight
+  // to the (grid-stepped) player position every frame, the view direction
+  // still jumps each tile-step, which reads as "shaking". So the look-at
+  // point is smoothed too, at the same rate as the camera position.
+  const lookTarget = useRef<THREE.Vector3 | null>(null);
+
   useFrame(({ camera }, delta) => {
     const { playerPos } = useGameStore.getState();
     const targetX = playerPos.x * TILE_SIZE;
-    const targetZ = playerPos.y * TILE_SIZE + 7;
+    const targetY = playerPos.y * TILE_SIZE;
+
+    if (!lookTarget.current) {
+      lookTarget.current = new THREE.Vector3(targetX, 0, targetY);
+      camera.position.set(targetX, 8.5, targetY + 7);
+    }
+
     const f = smoothFactor(4, delta);
-    camera.position.x += (targetX - camera.position.x) * f;
-    camera.position.z += (targetZ - camera.position.z) * f;
-    if (smoothedY.current === null) smoothedY.current = camera.position.y;
-    smoothedY.current += (8.5 - smoothedY.current) * f;
-    camera.position.y = smoothedY.current;
-    camera.lookAt(targetX, 0, targetZ - 7);
+    lookTarget.current.x += (targetX - lookTarget.current.x) * f;
+    lookTarget.current.z += (targetY - lookTarget.current.z) * f;
+
+    camera.position.x = lookTarget.current.x;
+    camera.position.z = lookTarget.current.z + 7;
+    camera.position.y = 8.5;
+    camera.lookAt(lookTarget.current.x, 0, lookTarget.current.z);
   });
   return null;
 }
