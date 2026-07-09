@@ -1,6 +1,6 @@
 import { X } from 'lucide-react';
-import { getPlayerEffectiveStats, useGameStore } from '../store';
-import type { EquipSlot } from '../types';
+import { equipmentDisplayName, getPlayerEffectiveStats, useGameStore } from '../store';
+import type { EquipSlot, Stats } from '../types';
 
 const SLOTS: EquipSlot[] = ['weapon', 'armor', 'accessory'];
 const STAT_LABELS: Record<string, string> = {
@@ -16,9 +16,14 @@ const STAT_LABELS: Record<string, string> = {
   luck: 'LUK',
 };
 
+const ALLOCATABLE_STATS: (keyof Stats)[] = ['maxHp', 'maxMp', 'atk', 'def', 'matk', 'mdef', 'spd', 'luck'];
+
 export function InventoryModal({ onClose }: { onClose: () => void }) {
   const player = useGameStore((s) => s.player);
   const useItem = useGameStore((s) => s.useItem);
+  const equipItem = useGameStore((s) => s.equipItem);
+  const unequipItem = useGameStore((s) => s.unequipItem);
+  const allocateStatPoint = useGameStore((s) => s.allocateStatPoint);
   const stats = getPlayerEffectiveStats(player);
 
   return (
@@ -42,6 +47,26 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
             ))}
         </div>
 
+        {player.statPoints > 0 && (
+          <div className="rounded-lg border border-amber-400/40 bg-amber-400/10 p-3">
+            <h3 className="mb-2 font-serif text-sm font-semibold text-amber-400">
+              {player.statPoints} Stat Point{player.statPoints > 1 ? 's' : ''} Available
+            </h3>
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+              {ALLOCATABLE_STATS.map((stat) => (
+                <button
+                  key={stat}
+                  type="button"
+                  onClick={() => allocateStatPoint(stat)}
+                  className="rounded-md border border-amber-400/40 bg-background/40 px-2 py-1.5 text-xs font-medium text-foreground hover-elevate active-elevate-2"
+                >
+                  +1 {STAT_LABELS[stat]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div>
           <h3 className="mb-2 font-serif text-sm font-semibold text-foreground">Equipment</h3>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -49,8 +74,19 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
               const eq = player.equipment[slot];
               return (
                 <div key={slot} className="rounded-md border border-card-border bg-background/40 p-2.5 text-xs">
-                  <div className="mb-1 capitalize text-muted-foreground">{slot}</div>
-                  <div className="font-medium text-foreground">{eq ? eq.name : 'None'}</div>
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="capitalize text-muted-foreground">{slot}</span>
+                    {eq && (
+                      <button
+                        type="button"
+                        onClick={() => unequipItem(slot)}
+                        className="rounded-md border border-card-border bg-background/60 px-1.5 py-0.5 text-[10px] font-medium hover-elevate active-elevate-2"
+                      >
+                        Unequip
+                      </button>
+                    )}
+                  </div>
+                  <div className="font-medium text-foreground">{eq ? equipmentDisplayName(eq) : 'None'}</div>
                   {eq && (
                     <div className="mt-1 text-muted-foreground">
                       {Object.entries(eq.statBonus)
@@ -63,6 +99,38 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
             })}
           </div>
         </div>
+
+        {player.equipmentInventory.length > 0 && (
+          <div>
+            <h3 className="mb-2 font-serif text-sm font-semibold text-foreground">Spare Gear</h3>
+            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              {player.equipmentInventory.map((eq) => (
+                <div
+                  key={eq.instanceUid}
+                  className="flex items-center justify-between rounded-md border border-card-border bg-background/40 px-3 py-2 text-xs"
+                >
+                  <div>
+                    <div className="font-medium capitalize text-foreground">
+                      {equipmentDisplayName(eq)} <span className="text-muted-foreground">({eq.slot})</span>
+                    </div>
+                    <div className="text-muted-foreground">
+                      {Object.entries(eq.statBonus)
+                        .map(([k, v]) => `${STAT_LABELS[k] ?? k} +${v}`)
+                        .join(', ')}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => equipItem(eq.instanceUid!)}
+                    className="shrink-0 rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover-elevate active-elevate-2"
+                  >
+                    Equip
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div>
           <h3 className="mb-2 font-serif text-sm font-semibold text-foreground">Items</h3>

@@ -1,4 +1,4 @@
-import { Backpack, Coins, Heart, Sparkles, Swords } from 'lucide-react';
+import { Backpack, Coins, Heart, Sparkles, Star, Swords } from 'lucide-react';
 import { getPlayerEffectiveStats, useGameStore } from '../store';
 
 function StatBar({
@@ -56,9 +56,17 @@ export function HUD({ onOpenInventory }: { onOpenInventory: () => void }) {
           <div className="flex items-center gap-1.5 text-sm font-medium text-primary">
             <Coins size={14} /> {player.gold}
           </div>
-          <div className="text-xs text-muted-foreground">
-            XP {player.xp}/{player.xpToNext}
-          </div>
+          <StatBar
+            value={player.xp}
+            max={player.xpToNext}
+            colorClass="bg-amber-400"
+            icon={<Star size={14} />}
+          />
+          {player.statPoints > 0 && (
+            <div className="text-xs font-semibold text-amber-400">
+              {player.statPoints} stat point{player.statPoints > 1 ? 's' : ''} available!
+            </div>
+          )}
           {dungeon && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <Swords size={12} /> Floor {dungeon.floor} — {dungeon.theme.name}

@@ -1,4 +1,5 @@
 import type {
+  CraftingRecipe,
   DungeonTheme,
   EnemyTemplate,
   Equipment,
@@ -270,7 +271,7 @@ export const ITEMS: Record<string, Item> = {
     id: 'dungeonKey',
     name: 'Dungeon Key',
     type: 'key',
-    description: 'Opens a locked door somewhere in this dungeon.',
+    description: 'Dropped by a floor boss. Required to unlock the stairs down.',
     value: 0,
   },
   magicGem: {
@@ -280,7 +281,254 @@ export const ITEMS: Record<string, Item> = {
     description: 'A radiant gem prized by collectors.',
     value: 50,
   },
+
+  // -------------------------------------------------------------------------
+  // Monster materials — thematic drops used for crafting and forge upgrades
+  // -------------------------------------------------------------------------
+  boneFragment: {
+    id: 'boneFragment',
+    name: 'Bone Fragment',
+    type: 'material',
+    description: 'A brittle shard from a skeletal warrior.',
+    value: 6,
+  },
+  golemCore: {
+    id: 'golemCore',
+    name: 'Golem Core',
+    type: 'material',
+    description: 'The pulsing stone heart of a rock golem.',
+    value: 22,
+  },
+  spectralEssence: {
+    id: 'spectralEssence',
+    name: 'Spectral Essence',
+    type: 'material',
+    description: 'A wisp of ectoplasm left behind by a ghost.',
+    value: 14,
+  },
+  spiderSilk: {
+    id: 'spiderSilk',
+    name: 'Spider Silk',
+    type: 'material',
+    description: 'Unnervingly strong thread from a crystal spider.',
+    value: 10,
+  },
+  slimeGel: {
+    id: 'slimeGel',
+    name: 'Slime Gel',
+    type: 'material',
+    description: 'A wobbling glob of translucent ooze.',
+    value: 5,
+  },
+  batWing: {
+    id: 'batWing',
+    name: 'Bat Wing',
+    type: 'material',
+    description: 'A leathery wing, still twitching faintly.',
+    value: 6,
+  },
+  emberCore: {
+    id: 'emberCore',
+    name: 'Ember Core',
+    type: 'material',
+    description: 'A smoldering cinder torn from a fire elemental.',
+    value: 16,
+  },
+  moltenCore: {
+    id: 'moltenCore',
+    name: 'Molten Core',
+    type: 'material',
+    description: 'A chunk of a lava golem, still searing hot.',
+    value: 24,
+  },
+  lizardScale: {
+    id: 'lizardScale',
+    name: 'Lizard Scale',
+    type: 'material',
+    description: 'A tough, heat-resistant scale.',
+    value: 8,
+  },
+  wolfFang: {
+    id: 'wolfFang',
+    name: 'Wolf Fang',
+    type: 'material',
+    description: 'A sharp fang from an ice wolf.',
+    value: 9,
+  },
+  frostEssence: {
+    id: 'frostEssence',
+    name: 'Frost Essence',
+    type: 'material',
+    description: 'A shard of condensed cold from a frost spirit.',
+    value: 14,
+  },
+  frozenCore: {
+    id: 'frozenCore',
+    name: 'Frozen Core',
+    type: 'material',
+    description: 'A perpetually icy heart from a snow golem.',
+    value: 20,
+  },
+  frogLeg: {
+    id: 'frogLeg',
+    name: 'Giant Frog Leg',
+    type: 'material',
+    description: 'Still twitching. Surprisingly useful.',
+    value: 7,
+  },
+  snakeFang: {
+    id: 'snakeFang',
+    name: 'Snake Fang',
+    type: 'material',
+    description: 'A venom-slicked fang from a poison snake.',
+    value: 9,
+  },
+  sporePod: {
+    id: 'sporePod',
+    name: 'Spore Pod',
+    type: 'material',
+    description: 'A pod bursting with alchemical spores.',
+    value: 8,
+  },
+
+  // -------------------------------------------------------------------------
+  // Boss trophies — rare, high-value crafting/upgrade materials
+  // -------------------------------------------------------------------------
+  tyrantSkull: {
+    id: 'tyrantSkull',
+    name: 'Tyrant Skull',
+    type: 'material',
+    description: "The Bone Tyrant's crowned skull.",
+    value: 90,
+  },
+  queenShard: {
+    id: 'queenShard',
+    name: 'Queen Shard',
+    type: 'material',
+    description: 'A brilliant crystal shard from the Crystal Queen.',
+    value: 100,
+  },
+  wyrmScale: {
+    id: 'wyrmScale',
+    name: 'Wyrm Scale',
+    type: 'material',
+    description: "A molten scale torn from the Inferno Wyrm's hide.",
+    value: 110,
+  },
+  monarchCrown: {
+    id: 'monarchCrown',
+    name: 'Monarch Crown',
+    type: 'material',
+    description: "The Frost Monarch's frozen circlet.",
+    value: 120,
+  },
+  boglordHeart: {
+    id: 'boglordHeart',
+    name: 'Boglord Heart',
+    type: 'material',
+    description: 'A slow, heavy heartbeat still echoes within.',
+    value: 130,
+  },
 };
+
+// ---------------------------------------------------------------------------
+// Crafting recipes — combine monster materials (+ gold) into consumables
+// ---------------------------------------------------------------------------
+export const RECIPES: CraftingRecipe[] = [
+  {
+    id: 'craftSmallPotion',
+    name: 'Small Potion',
+    description: 'Slime Gel binds into a mild restorative.',
+    resultItemId: 'smallPotion',
+    resultQty: 2,
+    materials: [{ itemId: 'slimeGel', qty: 2 }],
+    goldCost: 5,
+  },
+  {
+    id: 'craftLargePotion',
+    name: 'Large Potion',
+    description: 'A cracked Golem Core amplifies a potent brew.',
+    resultItemId: 'largePotion',
+    resultQty: 1,
+    materials: [{ itemId: 'golemCore', qty: 2 }],
+    goldCost: 15,
+  },
+  {
+    id: 'craftManaDraught',
+    name: 'Mana Draught',
+    description: 'Spectral Essence distilled into liquid mana.',
+    resultItemId: 'manaDraught',
+    resultQty: 1,
+    materials: [{ itemId: 'spectralEssence', qty: 2 }],
+    goldCost: 15,
+  },
+  {
+    id: 'craftStrengthPotion',
+    name: 'Strength Potion',
+    description: 'Ground Wolf Fang sharpens the drinker\'s might.',
+    resultItemId: 'strengthPotion',
+    resultQty: 1,
+    materials: [{ itemId: 'wolfFang', qty: 2 }],
+    goldCost: 10,
+  },
+  {
+    id: 'craftDefensePotion',
+    name: 'Defense Potion',
+    description: 'A Frozen Core chills the blood, hardening resolve.',
+    resultItemId: 'defensePotion',
+    resultQty: 1,
+    materials: [{ itemId: 'frozenCore', qty: 1 }],
+    goldCost: 10,
+  },
+  {
+    id: 'craftSpeedPotion',
+    name: 'Speed Potion',
+    description: 'Bat Wing extract lightens the step.',
+    resultItemId: 'speedPotion',
+    resultQty: 1,
+    materials: [{ itemId: 'batWing', qty: 2 }],
+    goldCost: 10,
+  },
+  {
+    id: 'craftFireBomb',
+    name: 'Fire Bomb',
+    description: 'An Ember Core packed into a volatile shell.',
+    resultItemId: 'fireBomb',
+    resultQty: 1,
+    materials: [{ itemId: 'emberCore', qty: 2 }],
+    goldCost: 12,
+  },
+  {
+    id: 'craftIceCrystal',
+    name: 'Ice Crystal',
+    description: 'Frost Essence honed into a throwable shard.',
+    resultItemId: 'iceCrystal',
+    resultQty: 1,
+    materials: [{ itemId: 'frostEssence', qty: 2 }],
+    goldCost: 12,
+  },
+  {
+    id: 'craftPoisonFlask',
+    name: 'Poison Flask',
+    description: 'Snake Fang venom, carefully bottled.',
+    resultItemId: 'poisonFlask',
+    resultQty: 1,
+    materials: [{ itemId: 'snakeFang', qty: 2 }],
+    goldCost: 12,
+  },
+  {
+    id: 'craftReviveScroll',
+    name: 'Revive Scroll',
+    description: 'Spider Silk thread binds a Spore Pod\'s vital spark into a scroll.',
+    resultItemId: 'reviveScroll',
+    resultQty: 1,
+    materials: [
+      { itemId: 'spiderSilk', qty: 2 },
+      { itemId: 'sporePod', qty: 2 },
+    ],
+    goldCost: 40,
+  },
+];
 
 // ---------------------------------------------------------------------------
 // Equipment
@@ -437,6 +685,7 @@ export const ENEMIES: Record<string, EnemyTemplate> = {
     weakness: 'holy',
     skillIds: [],
     color: '#d8d2c2',
+    lootTable: [{ itemId: 'boneFragment', chance: 0.6, min: 1, max: 2 }],
   },
   stoneGolem: {
     id: 'stoneGolem',
@@ -448,6 +697,7 @@ export const ENEMIES: Record<string, EnemyTemplate> = {
     resist: 'earth',
     skillIds: [],
     color: '#8a8272',
+    lootTable: [{ itemId: 'golemCore', chance: 0.45, min: 1, max: 1 }],
   },
   ghost: {
     id: 'ghost',
@@ -459,6 +709,7 @@ export const ENEMIES: Record<string, EnemyTemplate> = {
     resist: 'ice',
     skillIds: [],
     color: '#b9d6e8',
+    lootTable: [{ itemId: 'spectralEssence', chance: 0.55, min: 1, max: 2 }],
   },
   crystalSpider: {
     id: 'crystalSpider',
@@ -469,6 +720,7 @@ export const ENEMIES: Record<string, EnemyTemplate> = {
     weakness: 'fire',
     skillIds: [],
     color: '#8fd6e0',
+    lootTable: [{ itemId: 'spiderSilk', chance: 0.55, min: 1, max: 2 }],
   },
   slime: {
     id: 'slime',
@@ -479,6 +731,7 @@ export const ENEMIES: Record<string, EnemyTemplate> = {
     weakness: 'fire',
     skillIds: [],
     color: '#7ce0a0',
+    lootTable: [{ itemId: 'slimeGel', chance: 0.7, min: 1, max: 2 }],
   },
   bat: {
     id: 'bat',
@@ -488,6 +741,7 @@ export const ENEMIES: Record<string, EnemyTemplate> = {
     goldReward: 4,
     skillIds: [],
     color: '#4b3b57',
+    lootTable: [{ itemId: 'batWing', chance: 0.6, min: 1, max: 2 }],
   },
   fireElemental: {
     id: 'fireElemental',
@@ -499,6 +753,7 @@ export const ENEMIES: Record<string, EnemyTemplate> = {
     resist: 'fire',
     skillIds: [],
     color: '#f4763f',
+    lootTable: [{ itemId: 'emberCore', chance: 0.55, min: 1, max: 2 }],
   },
   lavaGolem: {
     id: 'lavaGolem',
@@ -510,6 +765,7 @@ export const ENEMIES: Record<string, EnemyTemplate> = {
     resist: 'fire',
     skillIds: [],
     color: '#c1441f',
+    lootTable: [{ itemId: 'moltenCore', chance: 0.45, min: 1, max: 1 }],
   },
   flameLizard: {
     id: 'flameLizard',
@@ -520,6 +776,7 @@ export const ENEMIES: Record<string, EnemyTemplate> = {
     weakness: 'ice',
     skillIds: [],
     color: '#e0862f',
+    lootTable: [{ itemId: 'lizardScale', chance: 0.6, min: 1, max: 2 }],
   },
   iceWolf: {
     id: 'iceWolf',
@@ -531,6 +788,7 @@ export const ENEMIES: Record<string, EnemyTemplate> = {
     resist: 'ice',
     skillIds: [],
     color: '#a9d8f0',
+    lootTable: [{ itemId: 'wolfFang', chance: 0.6, min: 1, max: 2 }],
   },
   frostSpirit: {
     id: 'frostSpirit',
@@ -541,6 +799,7 @@ export const ENEMIES: Record<string, EnemyTemplate> = {
     weakness: 'fire',
     skillIds: [],
     color: '#cdeeff',
+    lootTable: [{ itemId: 'frostEssence', chance: 0.55, min: 1, max: 2 }],
   },
   snowGolem: {
     id: 'snowGolem',
@@ -551,6 +810,7 @@ export const ENEMIES: Record<string, EnemyTemplate> = {
     weakness: 'fire',
     skillIds: [],
     color: '#eef6fb',
+    lootTable: [{ itemId: 'frozenCore', chance: 0.45, min: 1, max: 1 }],
   },
   giantFrog: {
     id: 'giantFrog',
@@ -560,6 +820,7 @@ export const ENEMIES: Record<string, EnemyTemplate> = {
     goldReward: 8,
     skillIds: [],
     color: '#5f9e4a',
+    lootTable: [{ itemId: 'frogLeg', chance: 0.6, min: 1, max: 2 }],
   },
   poisonSnake: {
     id: 'poisonSnake',
@@ -570,6 +831,7 @@ export const ENEMIES: Record<string, EnemyTemplate> = {
     weakness: 'fire',
     skillIds: [],
     color: '#6fae3a',
+    lootTable: [{ itemId: 'snakeFang', chance: 0.6, min: 1, max: 2 }],
   },
   mushroomMonster: {
     id: 'mushroomMonster',
@@ -580,8 +842,9 @@ export const ENEMIES: Record<string, EnemyTemplate> = {
     weakness: 'fire',
     skillIds: [],
     color: '#b25fae',
+    lootTable: [{ itemId: 'sporePod', chance: 0.6, min: 1, max: 2 }],
   },
-  // Bosses
+  // Bosses — always drop a Dungeon Key (handled in combat resolution) plus a rare trophy material.
   boneTyrant: {
     id: 'boneTyrant',
     name: 'Bone Tyrant',
@@ -592,6 +855,7 @@ export const ENEMIES: Record<string, EnemyTemplate> = {
     skillIds: [],
     color: '#e8e0c8',
     isBoss: true,
+    lootTable: [{ itemId: 'tyrantSkull', chance: 1, min: 1, max: 1 }],
   },
   crystalQueen: {
     id: 'crystalQueen',
@@ -603,6 +867,7 @@ export const ENEMIES: Record<string, EnemyTemplate> = {
     skillIds: [],
     color: '#7fe3f0',
     isBoss: true,
+    lootTable: [{ itemId: 'queenShard', chance: 1, min: 1, max: 1 }],
   },
   infernoWyrm: {
     id: 'infernoWyrm',
@@ -615,6 +880,7 @@ export const ENEMIES: Record<string, EnemyTemplate> = {
     skillIds: [],
     color: '#ff5a29',
     isBoss: true,
+    lootTable: [{ itemId: 'wyrmScale', chance: 1, min: 1, max: 1 }],
   },
   frostMonarch: {
     id: 'frostMonarch',
@@ -627,6 +893,7 @@ export const ENEMIES: Record<string, EnemyTemplate> = {
     skillIds: [],
     color: '#bfe9ff',
     isBoss: true,
+    lootTable: [{ itemId: 'monarchCrown', chance: 1, min: 1, max: 1 }],
   },
   boglord: {
     id: 'boglord',
@@ -638,6 +905,7 @@ export const ENEMIES: Record<string, EnemyTemplate> = {
     skillIds: [],
     color: '#3f7a3f',
     isBoss: true,
+    lootTable: [{ itemId: 'boglordHeart', chance: 1, min: 1, max: 1 }],
   },
 };
 

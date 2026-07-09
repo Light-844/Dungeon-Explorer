@@ -110,7 +110,6 @@ export function generateDungeonLevel(floor: number): DungeonLevel {
   const height = 21;
   const grid = makeGrid(width, height);
   const theme = pickTheme(floor);
-  const isFinalFloor = floor % THEMES.length === 0 || floor === 5;
 
   const rooms: DungeonRoom[] = [];
   const maxRooms = randInt(8, 11);
@@ -127,11 +126,12 @@ export function generateDungeonLevel(floor: number): DungeonLevel {
     rooms.push(candidate);
   }
 
-  // First room is the start room, last room becomes boss/stairs room
+  // First room is the start room, last room is always the boss room — every floor
+  // is guarded by a boss whose Dungeon Key drop is required to unlock the stairs down.
   rooms.sort((a, b) => a.x - b.x);
   const startRoom = rooms[0]!;
   const endRoom = rooms[rooms.length - 1]!;
-  endRoom.isBossRoom = isFinalFloor;
+  endRoom.isBossRoom = true;
   if (rooms.length > 2) {
     rooms[Math.floor(rooms.length / 2)]!.isShopRoom = Math.random() < 0.4;
   }
@@ -159,6 +159,7 @@ export function generateDungeonLevel(floor: number): DungeonLevel {
   }
 
   const enemies: Record<string, EnemyInstance> = {};
+  let bossInstanceId: string | null = null;
 
   // Populate rooms with content
   rooms.forEach((room, idx) => {
@@ -171,6 +172,7 @@ export function generateDungeonLevel(floor: number): DungeonLevel {
     if (room.isBossRoom) {
       const boss = spawnEnemy(theme.bossId, floor);
       enemies[boss.instanceId] = boss;
+      bossInstanceId = boss.instanceId;
       grid[center.y]![center.x]!.type = 'enemy';
       grid[center.y]![center.x]!.enemyInstanceId = boss.instanceId;
       return;
@@ -215,12 +217,11 @@ export function generateDungeonLevel(floor: number): DungeonLevel {
     }
   });
 
-  // Place stairs down in the room right before the boss room (or last room if not final floor).
+  // Place stairs down in the room right before the boss room — the boss room (endRoom)
+  // always holds this floor's boss now, so stairs never sit inside it.
   // Use a guaranteed BFS search outward from the room center for a plain, unoccupied floor
   // tile so stairs always spawn even if the exact center is taken by other content.
-  const stairsRoom = isFinalFloor
-    ? rooms[Math.max(0, rooms.length - 2)]!
-    : endRoom;
+  const stairsRoom = rooms[Math.max(0, rooms.length - 2)]!;
   const stairsCenter = roomCenter(stairsRoom);
   const stairsSpot = findNearestPlainFloor(grid, stairsCenter, width, height);
   if (stairsSpot) {
@@ -238,6 +239,7 @@ export function generateDungeonLevel(floor: number): DungeonLevel {
     rooms,
     startPos: startCenter,
     enemies,
+    bossInstanceId,
   };
 }
 

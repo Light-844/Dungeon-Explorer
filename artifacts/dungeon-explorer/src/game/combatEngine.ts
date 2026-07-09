@@ -67,18 +67,30 @@ export function xpToNextLevel(level: number): number {
   return Math.round(28 * Math.pow(level, 1.45));
 }
 
-export function statGainsForLevelUp(): Partial<Stats> {
+/** Small automatic growth on level-up, on top of the freely allocatable stat points. */
+export function autoStatGainsForLevelUp(): Partial<Stats> {
   return {
-    maxHp: 8,
-    maxMp: 3,
-    atk: 2,
-    def: 1,
-    matk: 2,
-    mdef: 1,
-    spd: 1,
-    luck: 1,
+    maxHp: 5,
+    maxMp: 2,
   };
 }
+
+/** Points granted to the player on every level-up, freely assignable to any stat. */
+export const STAT_POINTS_PER_LEVEL = 5;
+
+/** How much a single allocated point raises each stat by. */
+export const STAT_POINT_VALUE: Record<keyof Stats, number> = {
+  hp: 0,
+  maxHp: 6,
+  mp: 0,
+  maxMp: 3,
+  atk: 2,
+  def: 2,
+  matk: 2,
+  mdef: 2,
+  spd: 1,
+  luck: 1,
+};
 
 export function skillFitsTurn(skill: Skill, currentMp: number): boolean {
   return skill.mpCost <= currentMp;

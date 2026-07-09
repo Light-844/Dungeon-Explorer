@@ -1,1 +1,2 @@
 - [Turn-based battle state cloning](game-battle-state-cloning.md) — R3F/zustand game battles must clone enemy instances before mutating stats, or battle state corrupts shared world-state objects.
+- [Equipment instance identity](game-equipment-instance-identity.md) — clone-with-fresh-id every equipment entry point (loot, crafting, starting gear), not just the main loot path.

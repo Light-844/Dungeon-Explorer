@@ -1,21 +1,23 @@
 import { create } from 'zustand';
 import {
   BASE_PLAYER_STATS,
-  EQUIPMENT,
   ITEMS,
   LOOT_EQUIPMENT_POOL,
   LOOT_ITEM_POOL,
+  RECIPES,
   SKILL_UNLOCK_ORDER,
   SKILLS,
   STARTING_EQUIPMENT,
 } from './gameData';
 import { generateDungeonLevel, tileTypeIsWalkable } from './dungeonGenerator';
 import {
+  autoStatGainsForLevelUp,
   calcMagicDamage,
   calcPhysicalDamage,
   computeEffectiveStats,
   pickEnemyAction,
-  statGainsForLevelUp,
+  STAT_POINTS_PER_LEVEL,
+  STAT_POINT_VALUE,
   xpToNextLevel,
 } from './combatEngine';
 import type {
@@ -49,14 +51,17 @@ function freshPlayer(): PlayerCharacter {
     xpToNext: xpToNextLevel(1),
     gold: 30,
     baseStats: { ...BASE_PLAYER_STATS },
-    equipment: { ...STARTING_EQUIPMENT } as PlayerCharacter['equipment'],
+    equipment: Object.fromEntries(
+      Object.entries(STARTING_EQUIPMENT)
+        .filter(([, eq]) => !!eq)
+        .map(([slot, eq]) => [slot, cloneEquipmentInstance(eq as Equipment)]),
+    ) as PlayerCharacter['equipment'],
+    equipmentInventory: [],
     skillIds: SKILL_UNLOCK_ORDER.filter((s) => s.unlockLevel === 1).map(
       (s) => s.id,
     ),
-    inventory: [
-      { item: ITEMS.smallPotion!, quantity: 3 },
-      { item: ITEMS.dungeonKey!, quantity: 1 },
-    ],
+    inventory: [{ item: ITEMS.smallPotion!, quantity: 3 }],
+    statPoints: 0,
   };
 }
 
@@ -90,6 +95,13 @@ interface GameState {
   openChest: () => void;
   interactShop: () => void;
   buyFromShop: (itemId: string) => void;
+  sellItem: (itemId: string) => void;
+  sellEquipment: (instanceUid: string) => void;
+  craftItem: (recipeId: string) => void;
+  equipItem: (instanceUid: string) => void;
+  unequipItem: (slot: EquipSlot) => void;
+  upgradeEquipment: (slot: EquipSlot, materialItemId: string) => void;
+  allocateStatPoint: (stat: keyof Stats) => void;
   descendStairs: () => void;
   battleAction: (
     action: 'attack' | 'skill' | 'item' | 'defend' | 'flee',
@@ -210,12 +222,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     const player = get().player;
     if (roll < 0.35) {
       const eq = randChoice(LOOT_EQUIPMENT_POOL);
-      const updated = equipIfBetter(player, eq);
+      const instance = cloneEquipmentInstance(eq);
       set({
-        player: updated.player,
-        message: updated.equipped
-          ? `You found ${eq.name} and equipped it!`
-          : `You found ${eq.name} (kept your current gear — sold for ${eq.value}g).`,
+        player: { ...player, equipmentInventory: [...player.equipmentInventory, instance] },
+        message: `You found ${eq.name}! Equip it from your inventory.`,
         messageTone: 'success',
       });
     } else if (roll < 0.7) {
@@ -257,28 +267,174 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
 
+  sellItem: (itemId) => {
+    const player = get().player;
+    const stack = player.inventory.find((s) => s.item.id === itemId);
+    if (!stack || stack.quantity <= 0 || stack.item.type === 'key') return;
+    const price = Math.max(1, Math.floor(stack.item.value / 2));
+    set({
+      player: { ...consumeItem(player, itemId), gold: player.gold + price },
+    });
+  },
+
+  sellEquipment: (instanceUid) => {
+    const player = get().player;
+    const eq = player.equipmentInventory.find((e) => e.instanceUid === instanceUid);
+    if (!eq) return;
+    const price = Math.max(1, Math.floor(eq.value / 2) * (1 + (eq.upgradeLevel ?? 0)));
+    set({
+      player: {
+        ...player,
+        equipmentInventory: player.equipmentInventory.filter((e) => e.instanceUid !== instanceUid),
+        gold: player.gold + price,
+      },
+    });
+  },
+
+  craftItem: (recipeId) => {
+    const recipe = RECIPES.find((r) => r.id === recipeId);
+    if (!recipe) return;
+    const player = get().player;
+    if (player.gold < recipe.goldCost) {
+      set({ message: 'Not enough gold to craft that.', messageTone: 'warning' });
+      return;
+    }
+    for (const mat of recipe.materials) {
+      const stack = player.inventory.find((s) => s.item.id === mat.itemId);
+      if (!stack || stack.quantity < mat.qty) {
+        set({ message: 'Missing materials for that recipe.', messageTone: 'warning' });
+        return;
+      }
+    }
+    let nextPlayer = { ...player, gold: player.gold - recipe.goldCost };
+    for (const mat of recipe.materials) {
+      for (let i = 0; i < mat.qty; i++) {
+        nextPlayer = consumeItem(nextPlayer, mat.itemId);
+      }
+    }
+    const resultItem = ITEMS[recipe.resultItemId]!;
+    nextPlayer = addItem(nextPlayer, resultItem, recipe.resultQty);
+    set({
+      player: nextPlayer,
+      message: `Crafted ${recipe.resultQty > 1 ? `${recipe.resultQty}x ` : ''}${resultItem.name}!`,
+      messageTone: 'success',
+    });
+  },
+
+  equipItem: (instanceUid) => {
+    const player = get().player;
+    const gear = player.equipmentInventory.find((e) => e.instanceUid === instanceUid);
+    if (!gear) return;
+    const currentlyEquipped = player.equipment[gear.slot];
+    const nextEquipmentInventory = player.equipmentInventory.filter(
+      (e) => e.instanceUid !== instanceUid,
+    );
+    if (currentlyEquipped) {
+      nextEquipmentInventory.push(currentlyEquipped);
+    }
+    set({
+      player: {
+        ...player,
+        equipment: { ...player.equipment, [gear.slot]: gear },
+        equipmentInventory: nextEquipmentInventory,
+      },
+      message: `Equipped ${equipmentDisplayName(gear)}.`,
+      messageTone: 'success',
+    });
+  },
+
+  unequipItem: (slot) => {
+    const player = get().player;
+    const current = player.equipment[slot];
+    if (!current) return;
+    set({
+      player: {
+        ...player,
+        equipment: { ...player.equipment, [slot]: undefined },
+        equipmentInventory: [...player.equipmentInventory, current],
+      },
+      message: `Unequipped ${equipmentDisplayName(current)}.`,
+      messageTone: 'info',
+    });
+  },
+
+  upgradeEquipment: (slot, materialItemId) => {
+    const player = get().player;
+    const equipped = player.equipment[slot];
+    if (!equipped) {
+      set({ message: 'Nothing equipped in that slot.', messageTone: 'warning' });
+      return;
+    }
+    const level = equipped.upgradeLevel ?? 0;
+    if (level >= 5) {
+      set({ message: 'That item is already fully upgraded.', messageTone: 'warning' });
+      return;
+    }
+    const materialQtyNeeded = 2;
+    const goldCost = 20 * (level + 1);
+    const stack = player.inventory.find((s) => s.item.id === materialItemId);
+    if (!stack || stack.quantity < materialQtyNeeded) {
+      set({ message: 'Not enough of that material.', messageTone: 'warning' });
+      return;
+    }
+    if (player.gold < goldCost) {
+      set({ message: 'Not enough gold for the upgrade.', messageTone: 'warning' });
+      return;
+    }
+    let nextPlayer = { ...player, gold: player.gold - goldCost };
+    for (let i = 0; i < materialQtyNeeded; i++) {
+      nextPlayer = consumeItem(nextPlayer, materialItemId);
+    }
+    const upgradedBonus: Partial<Record<keyof Stats, number>> = { ...equipped.statBonus };
+    for (const key of Object.keys(upgradedBonus) as (keyof Stats)[]) {
+      const base = upgradedBonus[key] ?? 0;
+      upgradedBonus[key] = base + Math.max(1, Math.round(base * 0.15));
+    }
+    const upgraded: Equipment = { ...equipped, statBonus: upgradedBonus, upgradeLevel: level + 1 };
+    set({
+      player: { ...nextPlayer, equipment: { ...nextPlayer.equipment, [slot]: upgraded } },
+      message: `${equipmentDisplayName(equipped)} forged into ${equipmentDisplayName(upgraded)}!`,
+      messageTone: 'success',
+    });
+  },
+
+  allocateStatPoint: (stat) => {
+    const player = get().player;
+    if (player.statPoints <= 0) return;
+    const gain = STAT_POINT_VALUE[stat] || 1;
+    const baseStats = { ...player.baseStats, [stat]: player.baseStats[stat] + gain };
+    set({
+      player: { ...player, baseStats, statPoints: player.statPoints - 1 },
+    });
+  },
+
   descendStairs: () => {
     const { dungeon, playerPos, player } = get();
     if (!dungeon) return;
     const tile = dungeon.tiles[playerPos.y]?.[playerPos.x];
     if (!tile || tile.type !== 'stairsDown') return;
+
+    const bossAlive = !!dungeon.bossInstanceId && !!dungeon.enemies[dungeon.bossInstanceId];
+    const hasKey = player.inventory.some((s) => s.item.id === 'dungeonKey' && s.quantity > 0);
+    if (bossAlive || !hasKey) {
+      set({
+        message: 'The stairway is sealed — defeat this floor\'s boss for the Dungeon Key!',
+        messageTone: 'warning',
+      });
+      return;
+    }
+
     const nextFloor = dungeon.floor + 1;
     if (nextFloor > 5) {
-      const bossAlive = Object.values(dungeon.enemies).some((e) => e.isBoss);
-      if (bossAlive) {
-        set({
-          message: 'The way is sealed — defeat the floor boss first!',
-          messageTone: 'warning',
-        });
-        return;
-      }
-      set({ mode: 'victory' });
+      set({ player: consumeItem(player, 'dungeonKey'), mode: 'victory' });
       return;
     }
     const nextDungeon = generateDungeonLevel(nextFloor);
-    const stats = effectivePlayerStats(player);
+    const nextPlayer = consumeItem(player, 'dungeonKey');
+    const stats = effectivePlayerStats(nextPlayer);
     set({
       dungeon: nextDungeon,
+      player: nextPlayer,
       playerPos: { ...nextDungeon.startPos },
       playerHp: Math.min(get().playerHp + Math.round(stats.maxHp * 0.15), stats.maxHp),
       message: `Floor ${nextFloor} — ${nextDungeon.theme.name}`,
@@ -450,7 +606,39 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (aliveEnemies().length === 0) {
       const totalXp = battle.enemies.reduce((sum, e) => sum + e.xpReward, 0);
       const totalGold = battle.enemies.reduce((sum, e) => sum + e.goldReward, 0);
-      const leveledPlayer = grantXp(get().player, totalXp);
+      let leveledPlayer = grantXp(get().player, totalXp);
+      leveledPlayer = { ...leveledPlayer, gold: leveledPlayer.gold + totalGold };
+
+      // Roll thematic drops for each defeated enemy; bosses always drop a Dungeon Key.
+      const dropNames: string[] = [];
+      for (const enemy of battle.enemies) {
+        for (const drop of enemy.lootTable ?? []) {
+          if (Math.random() > drop.chance) continue;
+          const qty = randInt(drop.min ?? 1, drop.max ?? drop.min ?? 1);
+          if (drop.itemId) {
+            const item = ITEMS[drop.itemId];
+            if (item) {
+              leveledPlayer = addItem(leveledPlayer, item, qty);
+              dropNames.push(qty > 1 ? `${qty}x ${item.name}` : item.name);
+            }
+          } else if (drop.equipmentId) {
+            const eqTemplate = LOOT_EQUIPMENT_POOL.find((e) => e.id === drop.equipmentId);
+            if (eqTemplate) {
+              const instance = cloneEquipmentInstance(eqTemplate);
+              leveledPlayer = {
+                ...leveledPlayer,
+                equipmentInventory: [...leveledPlayer.equipmentInventory, instance],
+              };
+              dropNames.push(eqTemplate.name);
+            }
+          }
+        }
+        if (enemy.isBoss) {
+          leveledPlayer = addItem(leveledPlayer, ITEMS.dungeonKey!, 1);
+          dropNames.push('Dungeon Key');
+        }
+      }
+
       // Remove enemy from the dungeon map
       const dungeon = get().dungeon;
       if (dungeon && battle.originTileEnemyId) {
@@ -464,14 +652,15 @@ export const useGameStore = create<GameState>((set, get) => ({
           }
         }
       }
+      const dropText = dropNames.length ? ` Found: ${dropNames.join(', ')}.` : '';
       set({
         mode: 'exploring',
         battle: null,
         playerHp: Math.min(playerHp, effectivePlayerStats(leveledPlayer).maxHp) || playerHp,
         playerMp,
-        player: { ...leveledPlayer, gold: leveledPlayer.gold + totalGold },
+        player: leveledPlayer,
         dungeon: dungeon ? { ...dungeon } : dungeon,
-        message: `Victory! +${totalXp} XP, +${totalGold} gold.`,
+        message: `Victory! +${totalXp} XP, +${totalGold} gold.${dropText}`,
         messageTone: 'success',
       });
       return;
@@ -617,29 +806,26 @@ function addItem(player: PlayerCharacter, item: Item, qty: number): PlayerCharac
 }
 
 function consumeItem(player: PlayerCharacter, itemId: string): PlayerCharacter {
+  let consumed = false;
   const inventory = player.inventory
-    .map((s) => (s.item.id === itemId ? { ...s, quantity: s.quantity - 1 } : s))
+    .map((s) => {
+      if (!consumed && s.item.id === itemId) {
+        consumed = true;
+        return { ...s, quantity: s.quantity - 1 };
+      }
+      return s;
+    })
     .filter((s) => s.quantity > 0);
   return { ...player, inventory };
 }
 
-function equipIfBetter(
-  player: PlayerCharacter,
-  eq: Equipment,
-): { player: PlayerCharacter; equipped: boolean } {
-  const current = player.equipment[eq.slot];
-  const score = (e?: Equipment) =>
-    e ? Object.values(e.statBonus).reduce((a, b) => a + (b ?? 0), 0) : -Infinity;
-  if (score(eq) > score(current)) {
-    return {
-      player: { ...player, equipment: { ...player.equipment, [eq.slot]: eq } },
-      equipped: true,
-    };
-  }
-  return {
-    player: { ...player, gold: player.gold + eq.value },
-    equipped: false,
-  };
+function cloneEquipmentInstance(eq: Equipment): Equipment {
+  return { ...eq, instanceUid: uid(), upgradeLevel: 0 };
+}
+
+export function equipmentDisplayName(eq: Equipment): string {
+  const level = eq.upgradeLevel ?? 0;
+  return level > 0 ? `${eq.name} +${level}` : eq.name;
 }
 
 function grantXp(player: PlayerCharacter, xp: number): PlayerCharacter {
@@ -648,15 +834,17 @@ function grantXp(player: PlayerCharacter, xp: number): PlayerCharacter {
   let xpToNext = player.xpToNext;
   let baseStats = { ...player.baseStats };
   let skillIds = [...player.skillIds];
+  let statPoints = player.statPoints;
 
   while (curXp >= xpToNext) {
     curXp -= xpToNext;
     level += 1;
     xpToNext = xpToNextLevel(level);
-    const gains = statGainsForLevelUp();
+    const gains = autoStatGainsForLevelUp();
     for (const key of Object.keys(gains) as (keyof Stats)[]) {
       baseStats[key] = baseStats[key] + (gains[key] ?? 0);
     }
+    statPoints += STAT_POINTS_PER_LEVEL;
     baseStats.hp = baseStats.maxHp;
     baseStats.mp = baseStats.maxMp;
     const newSkills = SKILL_UNLOCK_ORDER.filter(
@@ -665,7 +853,7 @@ function grantXp(player: PlayerCharacter, xp: number): PlayerCharacter {
     skillIds = [...skillIds, ...newSkills.map((s) => s.id)];
   }
 
-  return { ...player, level, xp: curXp, xpToNext, baseStats, skillIds };
+  return { ...player, level, xp: curXp, xpToNext, baseStats, skillIds, statPoints };
 }
 
 export function startBattleWith(enemyRoot: EnemyInstance, tileEnemyId: string) {
