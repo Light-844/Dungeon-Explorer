@@ -26,6 +26,9 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 
 const SLOT_LABEL: Record<string, string> = { weapon: 'Weapon', armor: 'Armor', accessory: 'Accessory' };
 
+// Must match the material quantity `upgradeEquipment` consumes per forge in store.ts.
+const UPGRADE_MATERIAL_QTY = 2;
+
 export function ShopModal({ onClose }: { onClose: () => void }) {
   const player = useGameStore((s) => s.player);
   const buyFromShop = useGameStore((s) => s.buyFromShop);
@@ -37,6 +40,8 @@ export function ShopModal({ onClose }: { onClose: () => void }) {
   const [upgradeMaterial, setUpgradeMaterial] = useState<Record<string, string>>({});
 
   const materials = player.inventory.filter((s) => s.item.type === 'material');
+  // Only materials the player actually has enough of to perform a forge upgrade.
+  const upgradeableMaterials = materials.filter((s) => s.quantity >= UPGRADE_MATERIAL_QTY);
 
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/60 p-4">
@@ -187,9 +192,10 @@ export function ShopModal({ onClose }: { onClose: () => void }) {
               const eq = player.equipment[slot];
               const level = eq?.upgradeLevel ?? 0;
               const goldCost = 20 * (level + 1);
-              const selectedMaterial = upgradeMaterial[slot] ?? materials[0]?.item.id ?? '';
+              const selectedMaterial =
+                upgradeMaterial[slot] ?? upgradeableMaterials[0]?.item.id ?? '';
               const stack = player.inventory.find((s) => s.item.id === selectedMaterial);
-              const haveEnough = (stack?.quantity ?? 0) >= 2;
+              const haveEnough = (stack?.quantity ?? 0) >= UPGRADE_MATERIAL_QTY;
               return (
                 <div key={slot} className="rounded-md border border-card-border bg-background/40 p-3 text-xs">
                   <div className="mb-1 flex items-center justify-between">
@@ -202,8 +208,10 @@ export function ShopModal({ onClose }: { onClose: () => void }) {
                     <>
                       {level >= 5 ? (
                         <div className="text-muted-foreground">Fully upgraded.</div>
-                      ) : materials.length === 0 ? (
-                        <div className="text-muted-foreground">Need monster materials to upgrade.</div>
+                      ) : upgradeableMaterials.length === 0 ? (
+                        <div className="text-muted-foreground">
+                          Need at least {UPGRADE_MATERIAL_QTY}x of a monster material to upgrade.
+                        </div>
                       ) : (
                         <div className="flex items-center gap-2">
                           <select
@@ -213,7 +221,7 @@ export function ShopModal({ onClose }: { onClose: () => void }) {
                             }
                             className="rounded-md border border-card-border bg-background px-2 py-1 text-xs"
                           >
-                            {materials.map((m) => (
+                            {upgradeableMaterials.map((m) => (
                               <option key={m.item.id} value={m.item.id}>
                                 {m.item.name} (x{m.quantity})
                               </option>

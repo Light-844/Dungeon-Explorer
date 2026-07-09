@@ -606,8 +606,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (aliveEnemies().length === 0) {
       const totalXp = battle.enemies.reduce((sum, e) => sum + e.xpReward, 0);
       const totalGold = battle.enemies.reduce((sum, e) => sum + e.goldReward, 0);
+      const preLevel = get().player.level;
       let leveledPlayer = grantXp(get().player, totalXp);
       leveledPlayer = { ...leveledPlayer, gold: leveledPlayer.gold + totalGold };
+      const leveledUp = leveledPlayer.level > preLevel;
 
       // Roll thematic drops for each defeated enemy; bosses always drop a Dungeon Key.
       const dropNames: string[] = [];
@@ -653,14 +655,18 @@ export const useGameStore = create<GameState>((set, get) => ({
         }
       }
       const dropText = dropNames.length ? ` Found: ${dropNames.join(', ')}.` : '';
+      const newStats = effectivePlayerStats(leveledPlayer);
+      const finalHp = leveledUp ? newStats.maxHp : Math.min(playerHp, newStats.maxHp) || playerHp;
+      const finalMp = leveledUp ? newStats.maxMp : Math.min(playerMp, newStats.maxMp) || playerMp;
+      const levelUpText = leveledUp ? ' Level up! HP and MP fully restored.' : '';
       set({
         mode: 'exploring',
         battle: null,
-        playerHp: Math.min(playerHp, effectivePlayerStats(leveledPlayer).maxHp) || playerHp,
-        playerMp,
+        playerHp: finalHp,
+        playerMp: finalMp,
         player: leveledPlayer,
         dungeon: dungeon ? { ...dungeon } : dungeon,
-        message: `Victory! +${totalXp} XP, +${totalGold} gold.${dropText}`,
+        message: `Victory! +${totalXp} XP, +${totalGold} gold.${dropText}${levelUpText}`,
         messageTone: 'success',
       });
       return;
