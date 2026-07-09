@@ -106,15 +106,33 @@ function EnemyMarkers({ dungeon }: { dungeon: DungeonLevel }) {
   );
 }
 
+const FACING_ANGLE: Record<string, number> = {
+  up: Math.PI,
+  down: 0,
+  left: Math.PI / 2,
+  right: -Math.PI / 2,
+};
+
+// Frame-rate-independent smoothing: converges toward `target` at a fixed
+// "speed" regardless of the current FPS, so motion glides instead of
+// snapping in bigger steps at high refresh rates.
+function smoothFactor(speed: number, delta: number) {
+  return 1 - Math.exp(-speed * delta);
+}
+
 function PlayerToken() {
   const meshRef = useRef<THREE.Mesh>(null);
   const target = useRef(new THREE.Vector3());
 
-  useFrame(() => {
-    const { playerPos } = useGameStore.getState();
+  useFrame((_, delta) => {
+    const { playerPos, facing } = useGameStore.getState();
     target.current.set(playerPos.x * TILE_SIZE, 0.4, playerPos.y * TILE_SIZE);
     if (meshRef.current) {
-      meshRef.current.position.lerp(target.current, 0.25);
+      const f = smoothFactor(6, delta);
+      meshRef.current.position.lerp(target.current, f);
+      const targetAngle = FACING_ANGLE[facing] ?? 0;
+      const rotFactor = smoothFactor(10, delta);
+      meshRef.current.rotation.y += (targetAngle - meshRef.current.rotation.y) * rotFactor;
     }
   });
 
@@ -127,14 +145,18 @@ function PlayerToken() {
 }
 
 function CameraRig() {
-  useFrame(({ camera }) => {
+  const smoothedY = useRef<number | null>(null);
+  useFrame(({ camera }, delta) => {
     const { playerPos } = useGameStore.getState();
     const targetX = playerPos.x * TILE_SIZE;
     const targetZ = playerPos.y * TILE_SIZE + 7;
-    camera.position.x += (targetX - camera.position.x) * 0.08;
-    camera.position.z += (targetZ - camera.position.z) * 0.08;
-    camera.position.y = 8.5;
-    camera.lookAt(playerPos.x * TILE_SIZE, 0, playerPos.y * TILE_SIZE);
+    const f = smoothFactor(4, delta);
+    camera.position.x += (targetX - camera.position.x) * f;
+    camera.position.z += (targetZ - camera.position.z) * f;
+    if (smoothedY.current === null) smoothedY.current = camera.position.y;
+    smoothedY.current += (8.5 - smoothedY.current) * f;
+    camera.position.y = smoothedY.current;
+    camera.lookAt(targetX, 0, targetZ - 7);
   });
   return null;
 }
