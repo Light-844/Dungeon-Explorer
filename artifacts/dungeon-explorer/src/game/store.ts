@@ -110,6 +110,10 @@ interface GameState {
   useItem: (itemId: string) => void;
   clearMessage: () => void;
   returnToTitle: () => void;
+  /** Move every non-boss mob one tile along its wander path. */
+  tickMobWander: () => void;
+  /** Merge two spare-gear pieces of the same base item and upgrade level into one upgraded piece. */
+  mergeEquipment: (uid1: string, uid2: string) => void;
 }
 
 function effectivePlayerStats(player: PlayerCharacter): Stats {
@@ -201,6 +205,22 @@ export const useGameStore = create<GameState>((set, get) => ({
       });
       void stats;
       return;
+    }
+
+    // ── Proximity battle trigger ────────────────────────────────────────────
+    // If any non-boss mob is within 1 tile in all 8 directions of the new
+    // position, start a battle with it instead of just moving.
+    const PROXIMITY = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
+    for (const [ax, ay] of PROXIMITY) {
+      const adjTile = dungeon.tiles[ny + ay!]?.[nx + ax!];
+      if (adjTile?.type === 'enemy' && adjTile.enemyInstanceId) {
+        const adjEnemy = dungeon.enemies[adjTile.enemyInstanceId];
+        if (adjEnemy && !adjEnemy.isBoss) {
+          set({ playerPos: { x: nx, y: ny }, facing });
+          startBattleWith(adjEnemy, adjTile.enemyInstanceId);
+          return;
+        }
+      }
     }
 
     set({ playerPos: { x: nx, y: ny }, facing });
@@ -653,6 +673,8 @@ export const useGameStore = create<GameState>((set, get) => ({
             }
           }
         }
+        // Unlock boss door once all non-boss mobs are dead
+        checkAndUnlockBossDoor(dungeon);
       }
       const dropText = dropNames.length ? ` Found: ${dropNames.join(', ')}.` : '';
       const newStats = effectivePlayerStats(leveledPlayer);
@@ -725,6 +747,77 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
 
+  tickMobWander: () => {
+    const { dungeon, mode } = get();
+    if (!dungeon || mode !== 'exploring') return;
+
+    // Build instanceId → tile-position index once
+    const enemyTilePos: Record<string, { x: number; y: number }> = {};
+    for (const row of dungeon.tiles) {
+      for (const t of row) {
+        if (t.enemyInstanceId) enemyTilePos[t.enemyInstanceId] = { x: t.x, y: t.y };
+      }
+    }
+
+    let changed = false;
+    const DIRS = [{ dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 }];
+    const BLOCKED: Set<string> = new Set(['wall', 'lockedDoor', 'enemy', 'chest', 'shop', 'stairsDown', 'start']);
+
+    for (const [id, enemy] of Object.entries(dungeon.enemies)) {
+      if (enemy.isBoss) continue;
+      const pos = enemyTilePos[id];
+      if (!pos) continue;
+      const options: { x: number; y: number }[] = [];
+      for (const { dx, dy } of DIRS) {
+        const nx = pos.x + dx;
+        const ny = pos.y + dy;
+        const t = dungeon.tiles[ny]?.[nx];
+        if (!t || BLOCKED.has(t.type)) continue;
+        options.push({ x: nx, y: ny });
+      }
+      if (options.length === 0) continue;
+      const to = options[Math.floor(Math.random() * options.length)]!;
+      dungeon.tiles[pos.y]![pos.x]!.type = 'floor';
+      dungeon.tiles[pos.y]![pos.x]!.enemyInstanceId = undefined;
+      dungeon.tiles[to.y]![to.x]!.type = 'enemy';
+      dungeon.tiles[to.y]![to.x]!.enemyInstanceId = id;
+      changed = true;
+    }
+    if (changed) set({ dungeon: { ...dungeon } });
+  },
+
+  mergeEquipment: (uid1, uid2) => {
+    const player = get().player;
+    const eq1 = player.equipmentInventory.find((e) => e.instanceUid === uid1);
+    const eq2 = player.equipmentInventory.find((e) => e.instanceUid === uid2);
+    if (!eq1 || !eq2) return;
+    if (eq1.id !== eq2.id || (eq1.upgradeLevel ?? 0) !== (eq2.upgradeLevel ?? 0)) return;
+
+    const newLevel = (eq1.upgradeLevel ?? 0) + 1;
+    const mergedBonus: Partial<Record<keyof Stats, number>> = {};
+    const allKeys = new Set([
+      ...(Object.keys(eq1.statBonus) as (keyof Stats)[]),
+      ...(Object.keys(eq2.statBonus) as (keyof Stats)[]),
+    ]);
+    for (const key of allKeys) {
+      const v1 = eq1.statBonus[key] ?? 0;
+      const v2 = eq2.statBonus[key] ?? 0;
+      mergedBonus[key] = Math.round(Math.max(v1, v2) * 1.15 + 1);
+    }
+    const merged: Equipment = { ...eq1, instanceUid: uid(), upgradeLevel: newLevel, statBonus: mergedBonus };
+    set({
+      player: {
+        ...player,
+        equipmentInventory: [
+          ...player.equipmentInventory.filter((e) => e.instanceUid !== uid1 && e.instanceUid !== uid2),
+          merged,
+        ],
+      },
+      message: `Merged into ${equipmentDisplayName(merged)}!`,
+      messageTone: 'success',
+    });
+  },
+
   useItem: (itemId) => {
     const state = get();
     if (state.mode !== 'exploring') return;
@@ -769,6 +862,15 @@ export const useGameStore = create<GameState>((set, get) => ({
 // ---------------------------------------------------------------------------
 // Helpers that mutate/derive game state outside the store definition
 // ---------------------------------------------------------------------------
+
+/** Unlock the boss-room door once all non-boss enemies on this floor are dead. */
+function checkAndUnlockBossDoor(dungeon: DungeonLevel): void {
+  const nonBossAlive = Object.values(dungeon.enemies).some((e) => !e.isBoss);
+  if (nonBossAlive || !dungeon.bossDoorPos) return;
+  const { x, y } = dungeon.bossDoorPos;
+  const tile = dungeon.tiles[y]?.[x];
+  if (tile && tile.type === 'lockedDoor') tile.type = 'floor';
+}
 
 function findAdjacentChest(dungeon: DungeonLevel, pos: { x: number; y: number }) {
   const offsets = [

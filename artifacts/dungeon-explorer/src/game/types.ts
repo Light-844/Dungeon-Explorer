@@ -166,6 +166,8 @@ export interface DungeonLevel {
   enemies: Record<string, EnemyInstance>;
   /** Instance id of this floor's boss — the Dungeon Key it drops is required to descend. */
   bossInstanceId: string | null;
+  /** Position of the locked door guarding the boss room, unlocked when all non-boss enemies die. */
+  bossDoorPos: { x: number; y: number } | null;
 }
 
 export interface PlayerCharacter {

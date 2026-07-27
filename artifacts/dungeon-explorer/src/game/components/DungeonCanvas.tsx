@@ -19,6 +19,10 @@ function tileColor(tile: Tile, dungeon: DungeonLevel): string {
       return dungeon.theme.accentColor;
     case 'shop':
       return '#c98fd6';
+    case 'lockedDoor':
+      return '#1a0a0a';
+    case 'door':
+      return '#6b3a2a';
     case 'trap':
     case 'triggeredTrap':
       return dungeon.theme.floorColor;
@@ -64,9 +68,16 @@ function Floor({ dungeon }: { dungeon: DungeonLevel }) {
                 ? new THREE.Color(dungeon.theme.accentColor)
                 : tile.type === 'chest'
                   ? new THREE.Color('#8a6512')
-                  : new THREE.Color('#000000')
+                  : tile.type === 'lockedDoor'
+                    ? new THREE.Color('#cc1111')
+                    : new THREE.Color('#000000')
             }
-            emissiveIntensity={tile.type === 'stairsDown' ? 0.5 : tile.type === 'chest' ? 0.3 : 0}
+            emissiveIntensity={
+              tile.type === 'stairsDown' ? 0.5
+              : tile.type === 'chest' ? 0.3
+              : tile.type === 'lockedDoor' ? 0.6
+              : 0
+            }
             roughness={0.85}
           />
         </mesh>

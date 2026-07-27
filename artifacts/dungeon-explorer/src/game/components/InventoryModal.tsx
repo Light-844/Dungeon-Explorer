@@ -1,22 +1,39 @@
 import { X } from 'lucide-react';
 import { equipmentDisplayName, getPlayerEffectiveStats, useGameStore } from '../store';
-import type { EquipSlot, Stats } from '../types';
+import type { Equipment, EquipSlot, Stats } from '../types';
 
 const SLOTS: EquipSlot[] = ['weapon', 'armor', 'accessory'];
 const STAT_LABELS: Record<string, string> = {
-  hp: 'HP',
-  maxHp: 'HP',
-  mp: 'MP',
-  maxMp: 'MP',
-  atk: 'ATK',
-  def: 'DEF',
-  matk: 'MATK',
-  mdef: 'MDEF',
-  spd: 'SPD',
-  luck: 'LUK',
+  hp: 'HP', maxHp: 'HP', mp: 'MP', maxMp: 'MP',
+  atk: 'ATK', def: 'DEF', matk: 'MATK', mdef: 'MDEF', spd: 'SPD', luck: 'LUK',
 };
-
 const ALLOCATABLE_STATS: (keyof Stats)[] = ['maxHp', 'maxMp', 'atk', 'def', 'matk', 'mdef', 'spd', 'luck'];
+
+/** Two spare-gear pieces that can be merged (same id + same upgradeLevel). */
+interface MergeGroup {
+  eq1: Equipment;
+  eq2: Equipment;
+  key: string;
+}
+
+function buildMergeGroups(gear: Equipment[]): MergeGroup[] {
+  const groups: MergeGroup[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < gear.length; i++) {
+    for (let j = i + 1; j < gear.length; j++) {
+      const a = gear[i]!;
+      const b = gear[j]!;
+      if (a.id !== b.id) continue;
+      if ((a.upgradeLevel ?? 0) !== (b.upgradeLevel ?? 0)) continue;
+      const key = `${a.instanceUid}-${b.instanceUid}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        groups.push({ eq1: a, eq2: b, key });
+      }
+    }
+  }
+  return groups;
+}
 
 export function InventoryModal({ onClose }: { onClose: () => void }) {
   const player = useGameStore((s) => s.player);
@@ -24,19 +41,23 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
   const equipItem = useGameStore((s) => s.equipItem);
   const unequipItem = useGameStore((s) => s.unequipItem);
   const allocateStatPoint = useGameStore((s) => s.allocateStatPoint);
+  const mergeEquipment = useGameStore((s) => s.mergeEquipment);
   const stats = getPlayerEffectiveStats(player);
 
+  const mergeGroups = buildMergeGroups(player.equipmentInventory);
+
   return (
-    <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/60 p-4">
-      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col gap-4 overflow-y-auto rounded-xl border border-card-border bg-card p-5 shadow-2xl">
+    <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/60 p-2 sm:p-4">
+      <div className="flex max-h-[92vh] w-full max-w-2xl flex-col gap-3 overflow-y-auto rounded-xl border border-card-border bg-card p-4 shadow-2xl sm:gap-4 sm:p-5">
         <div className="flex items-center justify-between">
-          <h2 className="font-serif text-lg font-semibold text-primary">Inventory & Equipment</h2>
+          <h2 className="font-serif text-base font-semibold text-primary sm:text-lg">Inventory & Equipment</h2>
           <button type="button" onClick={onClose} className="rounded-md p-1.5 hover-elevate active-elevate-2">
             <X size={18} />
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 rounded-lg border border-card-border bg-background/40 p-3 text-xs sm:grid-cols-4">
+        {/* Stats grid */}
+        <div className="grid grid-cols-3 gap-2 rounded-lg border border-card-border bg-background/40 p-3 text-xs sm:grid-cols-4">
           {(Object.keys(stats) as (keyof typeof stats)[])
             .filter((k) => !['hp', 'mp'].includes(k))
             .map((key) => (
@@ -47,6 +68,7 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
             ))}
         </div>
 
+        {/* Stat point allocation */}
         {player.statPoints > 0 && (
           <div className="rounded-lg border border-amber-400/40 bg-amber-400/10 p-3">
             <h3 className="mb-2 font-serif text-sm font-semibold text-amber-400">
@@ -67,6 +89,7 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
           </div>
         )}
 
+        {/* Equipped slots */}
         <div>
           <h3 className="mb-2 font-serif text-sm font-semibold text-foreground">Equipment</h3>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -89,9 +112,7 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
                   <div className="font-medium text-foreground">{eq ? equipmentDisplayName(eq) : 'None'}</div>
                   {eq && (
                     <div className="mt-1 text-muted-foreground">
-                      {Object.entries(eq.statBonus)
-                        .map(([k, v]) => `${STAT_LABELS[k] ?? k} +${v}`)
-                        .join(', ')}
+                      {Object.entries(eq.statBonus).map(([k, v]) => `${STAT_LABELS[k] ?? k} +${v}`).join(', ')}
                     </div>
                   )}
                 </div>
@@ -100,6 +121,7 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
+        {/* Spare gear + merge */}
         {player.equipmentInventory.length > 0 && (
           <div>
             <h3 className="mb-2 font-serif text-sm font-semibold text-foreground">Spare Gear</h3>
@@ -111,27 +133,52 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
                 >
                   <div>
                     <div className="font-medium capitalize text-foreground">
-                      {equipmentDisplayName(eq)} <span className="text-muted-foreground">({eq.slot})</span>
+                      {equipmentDisplayName(eq)}{' '}
+                      <span className="text-muted-foreground">({eq.slot})</span>
                     </div>
                     <div className="text-muted-foreground">
-                      {Object.entries(eq.statBonus)
-                        .map(([k, v]) => `${STAT_LABELS[k] ?? k} +${v}`)
-                        .join(', ')}
+                      {Object.entries(eq.statBonus).map(([k, v]) => `${STAT_LABELS[k] ?? k} +${v}`).join(', ')}
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => equipItem(eq.instanceUid!)}
-                    className="shrink-0 rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover-elevate active-elevate-2"
+                    className="ml-2 shrink-0 rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover-elevate active-elevate-2"
                   >
                     Equip
                   </button>
                 </div>
               ))}
             </div>
+
+            {/* Merge section — appears only when mergeable pairs exist */}
+            {mergeGroups.length > 0 && (
+              <div className="mt-3 rounded-lg border border-secondary/30 bg-secondary/10 p-3">
+                <h4 className="mb-2 font-serif text-xs font-semibold text-secondary">
+                  ⚗ Merge — combine two identical pieces into one stronger item
+                </h4>
+                <div className="flex flex-col gap-1.5">
+                  {mergeGroups.map(({ eq1, eq2, key }) => (
+                    <div key={key} className="flex items-center justify-between rounded-md border border-card-border bg-background/40 px-3 py-2 text-xs">
+                      <span className="text-foreground">
+                        {equipmentDisplayName(eq1)} × 2 → {eq1.name} +{(eq1.upgradeLevel ?? 0) + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => mergeEquipment(eq1.instanceUid!, eq2.instanceUid!)}
+                        className="ml-2 shrink-0 rounded-md border border-secondary/40 bg-secondary/10 px-2 py-1 text-xs font-medium text-secondary hover-elevate active-elevate-2"
+                      >
+                        Merge
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
+        {/* Consumable items */}
         <div>
           <h3 className="mb-2 font-serif text-sm font-semibold text-foreground">Items</h3>
           <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">

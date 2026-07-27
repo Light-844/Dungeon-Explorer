@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Flame, Heart, Package, Shield, Sparkles, Swords, TowerControl } from 'lucide-react';
 import { getAvailableSkills, getPlayerEffectiveStats, useGameStore } from '../store';
 
@@ -13,11 +13,24 @@ export function BattleOverlay() {
   const [panel, setPanel] = useState<Panel>('root');
   const [targetIndex, setTargetIndex] = useState(0);
 
+  // Auto-advance target to the next alive enemy whenever the current one dies.
+  useEffect(() => {
+    if (!battle) return;
+    const alive = battle.enemies.findIndex((e) => e.stats.hp > 0);
+    if (alive >= 0 && battle.enemies[targetIndex]?.stats.hp <= 0) {
+      setTargetIndex(alive);
+    }
+  }, [battle, targetIndex]);
+
   if (!battle) return null;
   const stats = getPlayerEffectiveStats(player);
   const skills = getAvailableSkills(player);
   const aliveEnemies = battle.enemies.filter((e) => e.stats.hp > 0);
-  const effectiveTarget = Math.min(targetIndex, Math.max(0, battle.enemies.length - 1));
+  const effectiveTarget = (() => {
+    if (battle.enemies[targetIndex]?.stats.hp > 0) return targetIndex;
+    const first = battle.enemies.findIndex((e) => e.stats.hp > 0);
+    return first >= 0 ? first : 0;
+  })();
 
   function act(action: 'attack' | 'skill' | 'item' | 'defend' | 'flee', extra?: { skillId?: string; itemId?: string }) {
     battleAction(action, { ...extra, targetIndex: effectiveTarget });

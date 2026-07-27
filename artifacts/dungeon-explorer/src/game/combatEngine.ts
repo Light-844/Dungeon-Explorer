@@ -1,4 +1,4 @@
-import type { EnemyInstance, Skill, Stats } from './types';
+import type { EnemyInstance, Skill, Stats } from "./types";
 
 export function computeEffectiveStats(
   base: Stats,
@@ -33,7 +33,12 @@ export function calcPhysicalDamage(
   const raw = Math.max(1, attackerAtk * power - defenderDef * 0.6);
   const variance = 0.9 + Math.random() * 0.2;
   const amount = Math.round(raw * variance * (isCrit ? 1.8 : 1));
-  return { amount: Math.max(1, amount), isCrit, isWeak: false, isResist: false };
+  return {
+    amount: Math.max(1, amount),
+    isCrit,
+    isWeak: false,
+    isResist: false,
+  };
 }
 
 export function calcMagicDamage(
@@ -56,11 +61,11 @@ export function calcMagicDamage(
   return { amount: Math.max(1, amount), isCrit, isWeak, isResist };
 }
 
-export function pickEnemyAction(enemy: EnemyInstance): 'attack' | 'defend' {
+export function pickEnemyAction(enemy: EnemyInstance): "attack" | "defend" {
   // Simple AI: mostly attack, occasionally defend when low on HP
   const hpRatio = enemy.stats.hp / enemy.stats.maxHp;
-  if (hpRatio < 0.25 && Math.random() < 0.35) return 'defend';
-  return 'attack';
+  if (hpRatio < 0.25 && Math.random() < 0.35) return "defend";
+  return "attack";
 }
 
 export function xpToNextLevel(level: number): number {
@@ -80,9 +85,9 @@ export const STAT_POINTS_PER_LEVEL = 5;
 
 /** How much a single allocated point raises each stat by. */
 export const STAT_POINT_VALUE: Record<keyof Stats, number> = {
-  hp: 0,
+  hp: 1,
   maxHp: 6,
-  mp: 0,
+  mp: 1,
   maxMp: 3,
   atk: 2,
   def: 2,

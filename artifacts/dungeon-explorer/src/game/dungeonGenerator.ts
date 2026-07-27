@@ -74,10 +74,7 @@ function roomsOverlap(a: DungeonRoom, b: DungeonRoom, padding = 1): boolean {
   );
 }
 
-function spawnEnemy(
-  enemyId: string,
-  floor: number,
-): EnemyInstance {
+function spawnEnemy(enemyId: string, floor: number): EnemyInstance {
   const template = ENEMIES[enemyId]!;
   const scale = 1 + (floor - 1) * 0.22;
   const stats = {
@@ -106,6 +103,35 @@ export function pickTheme(floor: number): DungeonTheme {
   return THEMES[(floor - 1) % THEMES.length]!;
 }
 
+/** Find a corridor tile just outside the boss room to use as the locked door. */
+function findBossDoorTile(
+  grid: Tile[][],
+  bossRoom: DungeonRoom,
+): { x: number; y: number } | null {
+  // Walk the perimeter of the boss room and look one tile further out in each
+  // cardinal direction — those are the corridor tiles connecting it to the rest.
+  const candidates: { x: number; y: number }[] = [];
+
+  // Top and bottom edges
+  for (let x = bossRoom.x; x < bossRoom.x + bossRoom.w; x++) {
+    const above = grid[bossRoom.y - 1]?.[x];
+    if (above && above.type === 'floor') candidates.push({ x, y: bossRoom.y - 1 });
+    const below = grid[bossRoom.y + bossRoom.h]?.[x];
+    if (below && below.type === 'floor') candidates.push({ x, y: bossRoom.y + bossRoom.h });
+  }
+  // Left and right edges
+  for (let y = bossRoom.y; y < bossRoom.y + bossRoom.h; y++) {
+    const left = grid[y]?.[bossRoom.x - 1];
+    if (left && left.type === 'floor') candidates.push({ x: bossRoom.x - 1, y });
+    const right = grid[y]?.[bossRoom.x + bossRoom.w];
+    if (right && right.type === 'floor') candidates.push({ x: bossRoom.x + bossRoom.w, y });
+  }
+
+  if (candidates.length === 0) return null;
+  // Pick the candidate closest to the middle of the list for a stable position.
+  return candidates[Math.floor(candidates.length / 2)]!;
+}
+
 export function generateDungeonLevel(floor: number): DungeonLevel {
   const width = 27;
   const height = 21;
@@ -127,8 +153,7 @@ export function generateDungeonLevel(floor: number): DungeonLevel {
     rooms.push(candidate);
   }
 
-  // First room is the start room, last room is always the boss room — every floor
-  // is guarded by a boss whose Dungeon Key drop is required to unlock the stairs down.
+  // First room is the start room, last room is always the boss room.
   rooms.sort((a, b) => a.x - b.x);
   const startRoom = rooms[0]!;
   const endRoom = rooms[rooms.length - 1]!;
@@ -157,6 +182,14 @@ export function generateDungeonLevel(floor: number): DungeonLevel {
     const b = roomCenter(randChoice(rooms));
     carveCorridor(grid, a.x, a.y, b.x, a.y);
     carveCorridor(grid, b.x, a.y, b.x, b.y);
+  }
+
+  // ── Boss room door ──────────────────────────────────────────────────────────
+  // Place a locked door on the corridor tile just outside the boss room.
+  // It turns walkable once all regular mobs on this floor are defeated.
+  const bossDoorTile = findBossDoorTile(grid, endRoom);
+  if (bossDoorTile) {
+    grid[bossDoorTile.y]![bossDoorTile.x]!.type = 'lockedDoor';
   }
 
   const enemies: Record<string, EnemyInstance> = {};
@@ -218,10 +251,7 @@ export function generateDungeonLevel(floor: number): DungeonLevel {
     }
   });
 
-  // Place stairs down in the room right before the boss room — the boss room (endRoom)
-  // always holds this floor's boss now, so stairs never sit inside it.
-  // Use a guaranteed BFS search outward from the room center for a plain, unoccupied floor
-  // tile so stairs always spawn even if the exact center is taken by other content.
+  // Place stairs down in the room right before the boss room.
   const stairsRoom = rooms[Math.max(0, rooms.length - 2)]!;
   const stairsCenter = roomCenter(stairsRoom);
   const stairsSpot = findNearestPlainFloor(grid, stairsCenter, width, height);
@@ -241,6 +271,7 @@ export function generateDungeonLevel(floor: number): DungeonLevel {
     startPos: startCenter,
     enemies,
     bossInstanceId,
+    bossDoorPos: bossDoorTile ?? null,
   };
 }
 
@@ -248,10 +279,7 @@ export function tileTypeIsWalkable(type: TileType): boolean {
   return type !== 'wall' && type !== 'lockedDoor';
 }
 
-// BFS outward from `origin` for the nearest tile that is a plain, unoccupied floor
-// (or the start tile, in which case an adjacent plain floor tile is used instead so
-// the start position is never overwritten). Guarantees a placement whenever any
-// walkable floor exists in the level, so stairs can never fail to spawn.
+// BFS outward from `origin` for the nearest tile that is a plain, unoccupied floor.
 function findNearestPlainFloor(
   grid: Tile[][],
   origin: { x: number; y: number },
