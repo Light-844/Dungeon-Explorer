@@ -61,11 +61,27 @@ export function calcMagicDamage(
   return { amount: Math.max(1, amount), isCrit, isWeak, isResist };
 }
 
-export function pickEnemyAction(enemy: EnemyInstance): "attack" | "defend" {
-  // Simple AI: mostly attack, occasionally defend when low on HP
+export type EnemyAction =
+  | { type: 'attack' }
+  | { type: 'defend' }
+  | { type: 'skill'; skillId: string };
+
+export function pickEnemyAction(enemy: EnemyInstance): EnemyAction {
   const hpRatio = enemy.stats.hp / enemy.stats.maxHp;
-  if (hpRatio < 0.25 && Math.random() < 0.35) return "defend";
-  return "attack";
+
+  // Defend when low HP
+  if (hpRatio < 0.25 && Math.random() < 0.35) return { type: 'defend' };
+
+  // Use a skill if available (higher chance for bosses)
+  if (enemy.skillIds.length > 0) {
+    const skillChance = enemy.isBoss ? 0.6 : 0.35;
+    if (Math.random() < skillChance) {
+      const skillId = enemy.skillIds[Math.floor(Math.random() * enemy.skillIds.length)]!;
+      return { type: 'skill', skillId };
+    }
+  }
+
+  return { type: 'attack' };
 }
 
 export function xpToNextLevel(level: number): number {

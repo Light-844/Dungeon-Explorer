@@ -1,9 +1,9 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useGameStore } from '../store';
-import type { DungeonLevel, Tile } from '../types';
+import type { DungeonLevel, EnemyInstance, Tile } from '../types';
 
 const TILE_SIZE = 1;
 
@@ -23,6 +23,12 @@ function tileColor(tile: Tile, dungeon: DungeonLevel): string {
       return '#1a0a0a';
     case 'door':
       return '#6b3a2a';
+    case 'lavaTile':
+      return '#cc3300';
+    case 'iceTile':
+      return '#77ccee';
+    case 'mudTile':
+      return '#2e3d1a';
     case 'trap':
     case 'triggeredTrap':
       return dungeon.theme.floorColor;
@@ -53,79 +59,142 @@ function Floor({ dungeon }: { dungeon: DungeonLevel }) {
 
   return (
     <group>
-      {tiles.map(({ x, y, color, height, tile }) => (
-        <mesh
-          key={`${x}-${y}`}
-          position={[x * TILE_SIZE, height / 2 - 0.1, y * TILE_SIZE]}
-          castShadow={height > 0.3}
-          receiveShadow
+      {tiles.map(({ x, y, color, height, tile }) => {
+        const isLava = tile.type === 'lavaTile';
+        const isIce = tile.type === 'iceTile';
+        return (
+          <mesh
+            key={`${x}-${y}`}
+            position={[x * TILE_SIZE, height / 2 - 0.1, y * TILE_SIZE]}
+            castShadow={height > 0.3}
+            receiveShadow
+          >
+            <boxGeometry args={[TILE_SIZE * 0.96, height, TILE_SIZE * 0.96]} />
+            <meshStandardMaterial
+              color={color}
+              emissive={
+                tile.type === 'stairsDown'
+                  ? new THREE.Color(dungeon.theme.accentColor)
+                  : tile.type === 'chest'
+                    ? new THREE.Color('#8a6512')
+                    : tile.type === 'lockedDoor'
+                      ? new THREE.Color('#cc1111')
+                      : isLava
+                        ? new THREE.Color('#ff2200')
+                        : isIce
+                          ? new THREE.Color('#44aaff')
+                          : new THREE.Color('#000000')
+              }
+              emissiveIntensity={
+                tile.type === 'stairsDown' ? 0.5
+                : tile.type === 'chest' ? 0.3
+                : tile.type === 'lockedDoor' ? 0.6
+                : isLava ? 0.75
+                : isIce ? 0.3
+                : 0
+              }
+              roughness={isIce ? 0.15 : 0.85}
+              metalness={isIce ? 0.3 : 0}
+            />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+// Per-enemy marker with smooth lerp movement
+function EnemyMarker({
+  enemy,
+  logicalPos,
+}: {
+  enemy: EnemyInstance;
+  logicalPos: { x: number; y: number };
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const initialized = useRef(false);
+
+  // Snap to starting position on first render so there's no lerp from (0,0,0)
+  useEffect(() => {
+    if (groupRef.current && !initialized.current) {
+      groupRef.current.position.set(
+        logicalPos.x * TILE_SIZE,
+        0,
+        logicalPos.y * TILE_SIZE,
+      );
+      initialized.current = true;
+    }
+  });
+
+  useFrame((_, delta) => {
+    if (!groupRef.current) return;
+    if (!initialized.current) {
+      groupRef.current.position.set(
+        logicalPos.x * TILE_SIZE,
+        0,
+        logicalPos.y * TILE_SIZE,
+      );
+      initialized.current = true;
+      return;
+    }
+    const tx = logicalPos.x * TILE_SIZE;
+    const tz = logicalPos.y * TILE_SIZE;
+    const f = 1 - Math.exp(-5 * delta);
+    groupRef.current.position.x += (tx - groupRef.current.position.x) * f;
+    groupRef.current.position.z += (tz - groupRef.current.position.z) * f;
+  });
+
+  const size = enemy.isBoss ? 0.85 : 0.5;
+
+  return (
+    <group ref={groupRef}>
+      <mesh position={[0, size / 2 + 0.1, 0]} castShadow>
+        <boxGeometry args={[size, size, size]} />
+        <meshStandardMaterial
+          color={enemy.color}
+          emissive={enemy.color}
+          emissiveIntensity={enemy.isBoss ? 0.5 : 0.2}
+        />
+      </mesh>
+      <Html position={[0, size + 0.45, 0]} center distanceFactor={8} zIndexRange={[10, 0]}>
+        <div
+          className={`pointer-events-none flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[9px] font-medium backdrop-blur-sm ${
+            enemy.isBoss
+              ? 'border-primary/60 bg-primary/20 text-primary-foreground'
+              : 'border-white/15 bg-black/60 text-white'
+          }`}
         >
-          <boxGeometry args={[TILE_SIZE * 0.96, height, TILE_SIZE * 0.96]} />
-          <meshStandardMaterial
-            color={color}
-            emissive={
-              tile.type === 'stairsDown'
-                ? new THREE.Color(dungeon.theme.accentColor)
-                : tile.type === 'chest'
-                  ? new THREE.Color('#8a6512')
-                  : tile.type === 'lockedDoor'
-                    ? new THREE.Color('#cc1111')
-                    : new THREE.Color('#000000')
-            }
-            emissiveIntensity={
-              tile.type === 'stairsDown' ? 0.5
-              : tile.type === 'chest' ? 0.3
-              : tile.type === 'lockedDoor' ? 0.6
-              : 0
-            }
-            roughness={0.85}
+          <span
+            className="inline-block h-1.5 w-1.5 rounded-full"
+            style={{ backgroundColor: enemy.color }}
           />
-        </mesh>
-      ))}
+          <span>{enemy.name}</span>
+          <span className="opacity-70">Lv.{enemy.level}</span>
+        </div>
+      </Html>
     </group>
   );
 }
 
 function EnemyMarkers({ dungeon }: { dungeon: DungeonLevel }) {
-  const enemies = Object.values(dungeon.enemies);
+  // Build a map of instanceId → tile position
+  const posMap = useMemo(() => {
+    const m: Record<string, { x: number; y: number }> = {};
+    for (const row of dungeon.tiles) {
+      for (const t of row) {
+        if (t.enemyInstanceId) m[t.enemyInstanceId] = { x: t.x, y: t.y };
+      }
+    }
+    return m;
+  }, [dungeon]);
+
   return (
     <group>
-      {enemies.map((enemy) => {
-        let pos: { x: number; y: number } | null = null;
-        for (const row of dungeon.tiles) {
-          for (const t of row) {
-            if (t.enemyInstanceId === enemy.instanceId) pos = { x: t.x, y: t.y };
-          }
-        }
+      {Object.values(dungeon.enemies).map((enemy) => {
+        const pos = posMap[enemy.instanceId];
         if (!pos) return null;
-        const size = enemy.isBoss ? 0.85 : 0.5;
         return (
-          <group key={enemy.instanceId} position={[pos.x * TILE_SIZE, 0, pos.y * TILE_SIZE]}>
-            <mesh position={[0, size / 2 + 0.1, 0]} castShadow>
-              <boxGeometry args={[size, size, size]} />
-              <meshStandardMaterial
-                color={enemy.color}
-                emissive={enemy.color}
-                emissiveIntensity={enemy.isBoss ? 0.5 : 0.2}
-              />
-            </mesh>
-            <Html position={[0, size + 0.45, 0]} center distanceFactor={8} zIndexRange={[10, 0]}>
-              <div
-                className={`pointer-events-none flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[9px] font-medium backdrop-blur-sm ${
-                  enemy.isBoss
-                    ? 'border-primary/60 bg-primary/20 text-primary-foreground'
-                    : 'border-white/15 bg-black/60 text-white'
-                }`}
-              >
-                <span
-                  className="inline-block h-1.5 w-1.5 rounded-full"
-                  style={{ backgroundColor: enemy.color }}
-                />
-                <span>{enemy.name}</span>
-                <span className="opacity-70">Lv.{enemy.level}</span>
-              </div>
-            </Html>
-          </group>
+          <EnemyMarker key={enemy.instanceId} enemy={enemy} logicalPos={pos} />
         );
       })}
     </group>
@@ -139,9 +208,6 @@ const FACING_ANGLE: Record<string, number> = {
   right: -Math.PI / 2,
 };
 
-// Frame-rate-independent smoothing: converges toward `target` at a fixed
-// "speed" regardless of the current FPS, so motion glides instead of
-// snapping in bigger steps at high refresh rates.
 function smoothFactor(speed: number, delta: number) {
   return 1 - Math.exp(-speed * delta);
 }
@@ -158,9 +224,6 @@ function PlayerToken() {
       meshRef.current.position.lerp(target.current, f);
       const targetAngle = FACING_ANGLE[facing] ?? 0;
       const rotFactor = smoothFactor(10, delta);
-      // Shortest-arc angular delta, wrapped into (-PI, PI], so turning e.g.
-      // right -> up takes the short 90 degree turn instead of spinning the
-      // long way around when the raw angles straddle the +-PI seam.
       let angleDelta = (targetAngle - meshRef.current.rotation.y) % (Math.PI * 2);
       if (angleDelta > Math.PI) angleDelta -= Math.PI * 2;
       if (angleDelta < -Math.PI) angleDelta += Math.PI * 2;
@@ -177,10 +240,6 @@ function PlayerToken() {
 }
 
 function CameraRig() {
-  // The camera itself is smoothed, but if the look-at point snaps straight
-  // to the (grid-stepped) player position every frame, the view direction
-  // still jumps each tile-step, which reads as "shaking". So the look-at
-  // point is smoothed too, at the same rate as the camera position.
   const lookTarget = useRef<THREE.Vector3 | null>(null);
 
   useFrame(({ camera }, delta) => {

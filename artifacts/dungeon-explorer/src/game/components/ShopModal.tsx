@@ -13,6 +13,10 @@ const SHOP_ITEM_IDS = [
   'fireBomb',
   'iceCrystal',
   'reviveScroll',
+  // Terrain resistance items
+  'heatShield',
+  'frostCloak',
+  'bogSalve',
 ];
 
 type Tab = 'buy' | 'sell' | 'craft' | 'upgrade';
@@ -26,7 +30,9 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 
 const SLOT_LABEL: Record<string, string> = { weapon: 'Weapon', armor: 'Armor', accessory: 'Accessory' };
 
-// Must match the material quantity `upgradeEquipment` consumes per forge in store.ts.
+// Terrain items shown with a coloured accent so they stand out in the buy list.
+const TERRAIN_ITEM_IDS = new Set(['heatShield', 'frostCloak', 'bogSalve']);
+
 const UPGRADE_MATERIAL_QTY = 2;
 
 export function ShopModal({ onClose }: { onClose: () => void }) {
@@ -40,7 +46,6 @@ export function ShopModal({ onClose }: { onClose: () => void }) {
   const [upgradeMaterial, setUpgradeMaterial] = useState<Record<string, string>>({});
 
   const materials = player.inventory.filter((s) => s.item.type === 'material');
-  // Only materials the player actually has enough of to perform a forge upgrade.
   const upgradeableMaterials = materials.filter((s) => s.quantity >= UPGRADE_MATERIAL_QTY);
 
   return (
@@ -76,13 +81,18 @@ export function ShopModal({ onClose }: { onClose: () => void }) {
             {SHOP_ITEM_IDS.map((id) => {
               const item = ITEMS[id]!;
               const canAfford = player.gold >= item.value;
+              const isTerrain = TERRAIN_ITEM_IDS.has(id);
               return (
                 <button
                   key={id}
                   type="button"
                   disabled={!canAfford}
                   onClick={() => buyFromShop(id)}
-                  className="flex items-center justify-between rounded-md border border-card-border bg-background/40 px-3 py-2 text-left text-xs hover-elevate active-elevate-2 disabled:opacity-40"
+                  className={`flex items-center justify-between rounded-md border px-3 py-2 text-left text-xs hover-elevate active-elevate-2 disabled:opacity-40 ${
+                    isTerrain
+                      ? 'border-chart-5/30 bg-chart-5/5'
+                      : 'border-card-border bg-background/40'
+                  }`}
                 >
                   <div>
                     <div className="font-medium text-foreground">{item.name}</div>
@@ -101,7 +111,7 @@ export function ShopModal({ onClose }: { onClose: () => void }) {
               <div className="text-xs text-muted-foreground">Nothing to sell.</div>
             )}
             {player.inventory
-              .filter((s) => s.item.type !== 'key')
+              .filter((s) => s.item.type !== 'key' && s.item.type !== 'bossCore')
               .map((stack) => {
                 const price = Math.max(1, Math.floor(stack.item.value / 2));
                 return (

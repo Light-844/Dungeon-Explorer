@@ -77,6 +77,16 @@ export interface BattleState {
   originTileEnemyId: string | null;
 }
 
+/** Compute terrain timer initial value based on DEF: 100–250 seconds. */
+function calcTerrainTimer(def: number): number {
+  return Math.min(250, Math.max(100, 100 + def * 5));
+}
+
+/** Whether this theme triggers a terrain hazard timer (hot or cold). */
+function themeHasHazard(themeId: string): boolean {
+  return themeId === 'lavaCavern' || themeId === 'frozenCatacombs';
+}
+
 interface GameState {
   mode: GameMode;
   player: PlayerCharacter;
@@ -89,6 +99,18 @@ interface GameState {
   message: string | null;
   messageTone: 'info' | 'warning' | 'success';
   keysHeld: string | null;
+
+  // ── Terrain hazard state ────────────────────────────────────────────────────
+  /** Seconds remaining before hot/cold terrain begins dealing damage. null = no hazard. */
+  terrainTimerSeconds: number | null;
+  /** True once the timer expires — terrain now ticks damage. */
+  terrainDamaging: boolean;
+  /** Seconds of active terrain resistance (pauses timer & damage). 0 = none. */
+  terrainResistSeconds: number;
+  /** Internal counter for spacing terrain damage (damage fires every 10 s). */
+  terrainDamageInterval: number;
+  /** Move cooldown deadline (ms) for swamp slow. 0 = free to move. */
+  swampMoveCooldownMs: number;
 
   startNewGame: () => void;
   movePlayer: (dx: number, dy: number) => void;
@@ -110,13 +132,13 @@ interface GameState {
   useItem: (itemId: string) => void;
   clearMessage: () => void;
   returnToTitle: () => void;
-  /** Move every non-boss mob one tile along its wander path. */
   tickMobWander: () => void;
-  /** Merge two spare-gear pieces of the same base item and upgrade level into one upgraded piece. */
   mergeEquipment: (uid1: string, uid2: string) => void;
+  /** Tick terrain hazard timer by one second (called every 1 s while exploring). */
+  tickTerrainSecond: () => void;
 }
 
-function effectivePlayerStats(player: PlayerCharacter): Stats {
+function effectivePlayerStats(player: PlayerCharacter, swampSlowed = false): Stats {
   let s: Stats = { ...player.baseStats };
   for (const eq of Object.values(player.equipment)) {
     if (!eq) continue;
@@ -124,7 +146,17 @@ function effectivePlayerStats(player: PlayerCharacter): Stats {
       s[key] = s[key] + (eq.statBonus[key] ?? 0);
     }
   }
+  if (swampSlowed) {
+    s.spd = Math.max(1, s.spd - 4);
+  }
   return s;
+}
+
+function isSwampSlowed(state: Pick<GameState, 'dungeon' | 'terrainResistSeconds'>): boolean {
+  return (
+    state.dungeon?.theme.id === 'undergroundSwamp' &&
+    state.terrainResistSeconds <= 0
+  );
 }
 
 function pushLog(
@@ -147,11 +179,17 @@ export const useGameStore = create<GameState>((set, get) => ({
   message: null,
   messageTone: 'info',
   keysHeld: null,
+  terrainTimerSeconds: null,
+  terrainDamaging: false,
+  terrainResistSeconds: 0,
+  terrainDamageInterval: 0,
+  swampMoveCooldownMs: 0,
 
   startNewGame: () => {
     const player = freshPlayer();
     const dungeon = generateDungeonLevel(1);
     const stats = effectivePlayerStats(player);
+    const def = stats.def;
     set({
       mode: 'exploring',
       player,
@@ -162,16 +200,25 @@ export const useGameStore = create<GameState>((set, get) => ({
       battle: null,
       message: `Floor 1 — ${dungeon.theme.name}`,
       messageTone: 'info',
+      terrainTimerSeconds: themeHasHazard(dungeon.theme.id) ? calcTerrainTimer(def) : null,
+      terrainDamaging: false,
+      terrainResistSeconds: 0,
+      terrainDamageInterval: 0,
+      swampMoveCooldownMs: 0,
     });
   },
 
   returnToTitle: () => set({ mode: 'title' }),
-
   clearMessage: () => set({ message: null }),
 
   movePlayer: (dx, dy) => {
-    const { dungeon, playerPos, mode } = get();
+    const state = get();
+    const { dungeon, playerPos, mode } = state;
     if (!dungeon || mode !== 'exploring') return;
+
+    // Swamp slow: enforce a cooldown between moves when no resistance active.
+    if (isSwampSlowed(state) && Date.now() < state.swampMoveCooldownMs) return;
+
     const nx = playerPos.x + dx;
     const ny = playerPos.y + dy;
     const facing = dx === 1 ? 'right' : dx === -1 ? 'left' : dy === 1 ? 'down' : 'up';
@@ -192,7 +239,6 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     if (tile.type === 'trap') {
-      const stats = effectivePlayerStats(get().player);
       const dmg = randInt(4, 10);
       const newHp = Math.max(1, get().playerHp - dmg);
       tile.type = 'triggeredTrap';
@@ -203,34 +249,32 @@ export const useGameStore = create<GameState>((set, get) => ({
         message: `A hidden trap triggers! You take ${dmg} damage.`,
         messageTone: 'warning',
       });
-      void stats;
       return;
     }
 
     // ── Proximity battle trigger ────────────────────────────────────────────
-    // If any non-boss mob is within 1 tile in all 8 directions of the new
-    // position, start a battle with it instead of just moving.
     const PROXIMITY = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
     for (const [ax, ay] of PROXIMITY) {
       const adjTile = dungeon.tiles[ny + ay!]?.[nx + ax!];
       if (adjTile?.type === 'enemy' && adjTile.enemyInstanceId) {
         const adjEnemy = dungeon.enemies[adjTile.enemyInstanceId];
         if (adjEnemy && !adjEnemy.isBoss) {
-          set({ playerPos: { x: nx, y: ny }, facing });
+          const newCooldown = isSwampSlowed(state) ? Date.now() + 350 : 0;
+          set({ playerPos: { x: nx, y: ny }, facing, swampMoveCooldownMs: newCooldown });
           startBattleWith(adjEnemy, adjTile.enemyInstanceId);
           return;
         }
       }
     }
 
-    set({ playerPos: { x: nx, y: ny }, facing });
+    const newCooldown = isSwampSlowed(state) ? Date.now() + 350 : 0;
+    set({ playerPos: { x: nx, y: ny }, facing, swampMoveCooldownMs: newCooldown });
   },
 
   openChest: () => {
     const { dungeon, playerPos } = get();
     if (!dungeon) return;
     const tile = dungeon.tiles[playerPos.y]?.[playerPos.x];
-    // Also check adjacent-facing tile since chests sit on their own cell
     const target =
       tile?.type === 'chest'
         ? tile
@@ -459,6 +503,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       playerHp: Math.min(get().playerHp + Math.round(stats.maxHp * 0.15), stats.maxHp),
       message: `Floor ${nextFloor} — ${nextDungeon.theme.name}`,
       messageTone: 'info',
+      // Reset terrain state for the new floor
+      terrainTimerSeconds: themeHasHazard(nextDungeon.theme.id)
+        ? calcTerrainTimer(stats.def)
+        : null,
+      terrainDamaging: false,
+      terrainResistSeconds: 0,
+      terrainDamageInterval: 0,
+      swampMoveCooldownMs: 0,
     });
   },
 
@@ -470,8 +522,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       enemies: state.battle.enemies.map((e) => ({ ...e, stats: { ...e.stats } })),
     };
     const player = state.player;
+    const swampSlowed = isSwampSlowed(state);
     const playerStats = computeEffectiveStats(
-      effectivePlayerStats(player),
+      effectivePlayerStats(player, swampSlowed),
       battle.playerBuffs,
     );
     playerStats.hp = state.playerHp;
@@ -593,9 +646,7 @@ export const useGameStore = create<GameState>((set, get) => ({
             pushLog(battle, `${item.name} hits ${target.name} for ${amount}${isWeak ? ' (weak!)' : ''}.`, 'damage');
           }
         }
-        set({
-          player: consumeItem(get().player, item.id),
-        });
+        set({ player: consumeItem(get().player, item.id) });
       }
     } else if (action === 'defend') {
       playerDefending = true;
@@ -631,7 +682,6 @@ export const useGameStore = create<GameState>((set, get) => ({
       leveledPlayer = { ...leveledPlayer, gold: leveledPlayer.gold + totalGold };
       const leveledUp = leveledPlayer.level > preLevel;
 
-      // Roll thematic drops for each defeated enemy; bosses always drop a Dungeon Key.
       const dropNames: string[] = [];
       for (const enemy of battle.enemies) {
         for (const drop of enemy.lootTable ?? []) {
@@ -661,7 +711,6 @@ export const useGameStore = create<GameState>((set, get) => ({
         }
       }
 
-      // Remove enemy from the dungeon map
       const dungeon = get().dungeon;
       if (dungeon && battle.originTileEnemyId) {
         delete dungeon.enemies[battle.originTileEnemyId];
@@ -673,7 +722,6 @@ export const useGameStore = create<GameState>((set, get) => ({
             }
           }
         }
-        // Unlock boss door once all non-boss mobs are dead
         checkAndUnlockBossDoor(dungeon);
       }
       const dropText = dropNames.length ? ` Found: ${dropNames.join(', ')}.` : '';
@@ -694,15 +742,38 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    // Enemy turn(s)
+    // ── Enemy turn(s) ───────────────────────────────────────────────────────
     let hp = playerHp;
     for (const enemy of battle.enemies) {
       if (enemy.stats.hp <= 0) continue;
       const enemyAction = pickEnemyAction(enemy);
-      if (enemyAction === 'defend') {
+
+      if (enemyAction.type === 'defend') {
         pushLog(battle, `${enemy.name} braces for the next attack.`, 'system');
         continue;
       }
+
+      if (enemyAction.type === 'skill') {
+        const skill = SKILLS[enemyAction.skillId];
+        if (skill) {
+          const defStat = playerDefending ? playerStats.def * 2 : playerStats.def;
+          const mdefStat = playerDefending ? playerStats.mdef * 1.5 : playerStats.mdef;
+          const dmg =
+            skill.type === 'magic'
+              ? calcMagicDamage(enemy.stats.matk, mdefStat, skill.power, enemy.stats.luck, skill.element)
+              : calcPhysicalDamage(enemy.stats.atk, defStat, skill.power, enemy.stats.luck);
+          hp = Math.max(0, hp - dmg.amount);
+          pushLog(
+            battle,
+            `${enemy.name} uses ${skill.name} for ${dmg.amount}${dmg.isCrit ? ' (Critical!)' : ''}!`,
+            'damage',
+          );
+          if (hp <= 0) break;
+          continue;
+        }
+      }
+
+      // Regular attack
       const dmg = calcPhysicalDamage(
         enemy.stats.atk,
         playerDefending ? playerStats.def * 2 : playerStats.def,
@@ -719,11 +790,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     if (hp <= 0) {
-      const player = get().player;
-      const reviveStack = player.inventory.find((s) => s.item.id === 'reviveScroll' && s.quantity > 0);
+      const currentPlayer = get().player;
+      const reviveStack = currentPlayer.inventory.find(
+        (s) => s.item.id === 'reviveScroll' && s.quantity > 0,
+      );
       if (reviveStack) {
         set({
-          player: consumeItem(player, 'reviveScroll'),
+          player: consumeItem(currentPlayer, 'reviveScroll'),
           playerHp: reviveStack.item.healAmount ?? 30,
           playerMp,
           battle: { ...battle, playerBuffs, playerDefending },
@@ -732,11 +805,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         });
         return;
       }
-      set({
-        mode: 'gameover',
-        battle: null,
-        playerHp: 0,
-      });
+      set({ mode: 'gameover', battle: null, playerHp: 0 });
       return;
     }
 
@@ -751,7 +820,6 @@ export const useGameStore = create<GameState>((set, get) => ({
     const { dungeon, mode } = get();
     if (!dungeon || mode !== 'exploring') return;
 
-    // Build instanceId → tile-position index once
     const enemyTilePos: Record<string, { x: number; y: number }> = {};
     for (const row of dungeon.tiles) {
       for (const t of row) {
@@ -824,11 +892,56 @@ export const useGameStore = create<GameState>((set, get) => ({
     const stack = state.player.inventory.find((s) => s.item.id === itemId);
     if (!stack || stack.quantity <= 0) return;
     const item = stack.item;
-    if (item.type !== 'heal' && !item.mpAmount && !item.buffStat) {
+
+    // ── Boss core consumption ──────────────────────────────────────────────
+    if (item.type === 'bossCore') {
+      const player = state.player;
+      let nextPlayer = consumeItem(player, item.id);
+
+      if (item.grantSkillId && !player.skillIds.includes(item.grantSkillId)) {
+        // Grant the new skill
+        nextPlayer = { ...nextPlayer, skillIds: [...nextPlayer.skillIds, item.grantSkillId] };
+        const skill = SKILLS[item.grantSkillId];
+        set({
+          player: nextPlayer,
+          message: `You absorb the core and learn ${skill?.name ?? item.grantSkillId}!`,
+          messageTone: 'success',
+        });
+      } else if (item.fallbackStatBonus) {
+        // Skill already known — grant stat bonus instead
+        const gains = item.fallbackStatBonus;
+        const baseStats = { ...nextPlayer.baseStats };
+        for (const key of Object.keys(gains) as (keyof Stats)[]) {
+          baseStats[key] = (baseStats[key] ?? 0) + (gains[key] ?? 0);
+        }
+        nextPlayer = { ...nextPlayer, baseStats };
+        const bonusText = Object.entries(gains)
+          .map(([k, v]) => `+${v} ${k.toUpperCase()}`)
+          .join(', ');
+        set({
+          player: nextPlayer,
+          message: `Skill already known — you gain ${bonusText} instead!`,
+          messageTone: 'success',
+        });
+      }
+      return;
+    }
+
+    // ── Terrain resistance items ───────────────────────────────────────────
+    if (item.terrainResist) {
+      const seconds = item.resistSeconds ?? 60;
+      const newResist = state.terrainResistSeconds + seconds;
       set({
-        message: `${item.name} can only be used in battle.`,
-        messageTone: 'info',
+        player: consumeItem(state.player, item.id),
+        terrainResistSeconds: newResist,
+        message: `${item.name} active — terrain hazard resisted for ${seconds}s!`,
+        messageTone: 'success',
       });
+      return;
+    }
+
+    if (item.type !== 'heal' && !item.mpAmount && !item.buffStat) {
+      set({ message: `${item.name} can only be used in battle.`, messageTone: 'info' });
       return;
     }
 
@@ -857,13 +970,59 @@ export const useGameStore = create<GameState>((set, get) => ({
       messageTone: 'success',
     });
   },
+
+  tickTerrainSecond: () => {
+    const state = get();
+    if (state.mode !== 'exploring' || !state.dungeon) return;
+
+    // Tick down resistance timer first.
+    const newResist = Math.max(0, state.terrainResistSeconds - 1);
+
+    // While resisted, don't advance the hazard.
+    if (state.terrainResistSeconds > 0) {
+      set({ terrainResistSeconds: newResist });
+      return;
+    }
+
+    // Hot / cold terrain timer countdown.
+    if (state.terrainTimerSeconds !== null && state.terrainTimerSeconds > 0) {
+      set({ terrainTimerSeconds: state.terrainTimerSeconds - 1, terrainResistSeconds: newResist });
+      return;
+    }
+
+    // Timer expired → damage phase. Tick every 10 s.
+    if (state.terrainTimerSeconds === 0 || state.terrainDamaging) {
+      const nextInterval = state.terrainDamageInterval + 1;
+      if (nextInterval >= 10) {
+        const dmg = randInt(4, 10);
+        const newHp = Math.max(1, get().playerHp - dmg);
+        const themeId = state.dungeon.theme.id;
+        const src = themeId === 'lavaCavern' ? '🔥 Scorching heat' : '❄️ Bitter cold';
+        set({
+          playerHp: newHp,
+          terrainDamaging: true,
+          terrainTimerSeconds: 0,
+          terrainDamageInterval: 0,
+          terrainResistSeconds: newResist,
+          message: `${src} deals ${dmg} damage!`,
+          messageTone: 'warning',
+        });
+      } else {
+        set({
+          terrainDamaging: true,
+          terrainTimerSeconds: 0,
+          terrainDamageInterval: nextInterval,
+          terrainResistSeconds: newResist,
+        });
+      }
+    }
+  },
 }));
 
 // ---------------------------------------------------------------------------
-// Helpers that mutate/derive game state outside the store definition
+// Helpers
 // ---------------------------------------------------------------------------
 
-/** Unlock the boss-room door once all non-boss enemies on this floor are dead. */
 function checkAndUnlockBossDoor(dungeon: DungeonLevel): void {
   const nonBossAlive = Object.values(dungeon.enemies).some((e) => !e.isBoss);
   if (nonBossAlive || !dungeon.bossDoorPos) return;
@@ -873,13 +1032,7 @@ function checkAndUnlockBossDoor(dungeon: DungeonLevel): void {
 }
 
 function findAdjacentChest(dungeon: DungeonLevel, pos: { x: number; y: number }) {
-  const offsets = [
-    [0, 0],
-    [1, 0],
-    [-1, 0],
-    [0, 1],
-    [0, -1],
-  ];
+  const offsets = [[0,0],[1,0],[-1,0],[0,1],[0,-1]];
   for (const [dx, dy] of offsets) {
     const t = dungeon.tiles[pos.y + dy!]?.[pos.x + dx!];
     if (t && t.type === 'chest') return t;
@@ -888,13 +1041,7 @@ function findAdjacentChest(dungeon: DungeonLevel, pos: { x: number; y: number })
 }
 
 function findAdjacentShop(dungeon: DungeonLevel, pos: { x: number; y: number }) {
-  const offsets = [
-    [0, 0],
-    [1, 0],
-    [-1, 0],
-    [0, 1],
-    [0, -1],
-  ];
+  const offsets = [[0,0],[1,0],[-1,0],[0,1],[0,-1]];
   for (const [dx, dy] of offsets) {
     const t = dungeon.tiles[pos.y + dy!]?.[pos.x + dx!];
     if (t && t.type === 'shop') return t;
@@ -968,10 +1115,10 @@ export function startBattleWith(enemyRoot: EnemyInstance, tileEnemyId: string) {
   const state = useGameStore.getState();
   const dungeon = state.dungeon;
   if (!dungeon) return;
+
   const groupSize = enemyRoot.isBoss ? 1 : randInt(1, 2);
   const enemies: EnemyInstance[] = [enemyRoot];
   if (!enemyRoot.isBoss && groupSize > 1) {
-    // Pull one more enemy of the same theme, freshly generated (visual-only add-on)
     const extra: EnemyInstance = {
       ...enemyRoot,
       instanceId: `${enemyRoot.id}-${Math.random().toString(36).slice(2, 9)}`,
@@ -979,11 +1126,25 @@ export function startBattleWith(enemyRoot: EnemyInstance, tileEnemyId: string) {
     };
     enemies.push(extra);
   }
+
+  // Apply swamp SPD debuff as an initial player buff when fighting in swamp terrain.
+  const swampSlowed =
+    dungeon.theme.id === 'undergroundSwamp' && state.terrainResistSeconds <= 0;
+  const startingBuffs: Partial<Record<keyof import('./types').Stats, number>> = swampSlowed
+    ? { spd: -4 }
+    : {};
+
   const battle: BattleState = {
     enemies,
-    playerBuffs: {},
+    playerBuffs: startingBuffs,
     turn: 'player',
-    log: [{ id: uid(), text: `${enemyRoot.isBoss ? 'A powerful foe' : 'An enemy'} blocks your path!`, tone: 'info' }],
+    log: [
+      {
+        id: uid(),
+        text: `${enemyRoot.isBoss ? 'A powerful foe' : 'An enemy'} blocks your path!${swampSlowed ? ' (Swamp slows your reactions.)' : ''}`,
+        tone: 'info',
+      },
+    ],
     targetIndex: 0,
     playerDefending: false,
     fleeAttempted: false,
@@ -993,7 +1154,7 @@ export function startBattleWith(enemyRoot: EnemyInstance, tileEnemyId: string) {
   useGameStore.setState({ mode: 'battle', battle });
 }
 
-export function getPlayerEffectiveStats(player: PlayerCharacter): Stats {
+export function getPlayerEffectiveStats(player: PlayerCharacter): import('./types').Stats {
   return effectivePlayerStats(player);
 }
 

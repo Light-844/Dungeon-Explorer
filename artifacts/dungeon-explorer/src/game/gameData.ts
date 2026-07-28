@@ -171,11 +171,96 @@ export const SKILLS: Record<string, Skill> = {
     unlockLevel: 12,
     target: 'enemy',
   },
+
+  // -------------------------------------------------------------------------
+  // Boss skills — used by bosses in combat (also grantable via boss cores)
+  // -------------------------------------------------------------------------
+  shadowBolt: {
+    id: 'shadowBolt',
+    name: 'Shadow Bolt',
+    type: 'magic',
+    mpCost: 8,
+    power: 1.4,
+    element: 'holy',
+    description: 'A bolt of necrotic energy that weakens the foe.',
+    unlockLevel: 99,
+    target: 'enemy',
+  },
+  crystalShatter: {
+    id: 'crystalShatter',
+    name: 'Crystal Shatter',
+    type: 'magic',
+    mpCost: 12,
+    power: 2.0,
+    element: 'lightning',
+    description: 'Explode crystalline shards through the target.',
+    unlockLevel: 99,
+    target: 'enemy',
+  },
+  infernoBreath: {
+    id: 'infernoBreath',
+    name: 'Inferno Breath',
+    type: 'magic',
+    mpCost: 13,
+    power: 1.7,
+    element: 'fire',
+    description: 'Exhale a torrent of searing flame at all foes.',
+    unlockLevel: 99,
+    target: 'allEnemies',
+  },
+  blizzard: {
+    id: 'blizzard',
+    name: 'Blizzard',
+    type: 'magic',
+    mpCost: 13,
+    power: 1.7,
+    element: 'ice',
+    description: 'Summon a howling blizzard that batters all enemies.',
+    unlockLevel: 99,
+    target: 'allEnemies',
+  },
+  toxicCloud: {
+    id: 'toxicCloud',
+    name: 'Toxic Cloud',
+    type: 'magic',
+    mpCost: 11,
+    power: 1.4,
+    element: 'poison',
+    description: 'Release a billowing cloud of corrosive toxin.',
+    unlockLevel: 99,
+    target: 'allEnemies',
+  },
+
+  // -------------------------------------------------------------------------
+  // Enemy-only elemental skills injected at floor 4+ into normal mobs
+  // -------------------------------------------------------------------------
+  crystalBurst: {
+    id: 'crystalBurst',
+    name: 'Crystal Burst',
+    type: 'magic',
+    mpCost: 6,
+    power: 1.2,
+    element: 'lightning',
+    description: 'Launches a burst of razor-sharp crystal fragments.',
+    unlockLevel: 99,
+    target: 'enemy',
+  },
+  poisonStrike: {
+    id: 'poisonStrike',
+    name: 'Poison Strike',
+    type: 'physical',
+    mpCost: 5,
+    power: 1.2,
+    element: 'poison',
+    description: 'A venomous strike that deals extra damage.',
+    unlockLevel: 99,
+    target: 'enemy',
+  },
 };
 
-export const SKILL_UNLOCK_ORDER = Object.values(SKILLS).sort(
-  (a, b) => a.unlockLevel - b.unlockLevel,
-);
+export const SKILL_UNLOCK_ORDER = Object.values(SKILLS)
+  .filter((s) => s.unlockLevel < 99)
+  .sort((a, b) => a.unlockLevel - b.unlockLevel);
 
 // ---------------------------------------------------------------------------
 // Items
@@ -280,6 +365,46 @@ export const ITEMS: Record<string, Item> = {
     type: 'material',
     description: 'A radiant gem prized by collectors.',
     value: 50,
+  },
+
+  // -------------------------------------------------------------------------
+  // Terrain resistance consumables
+  // -------------------------------------------------------------------------
+  heatShield: {
+    id: 'heatShield',
+    name: 'Heat Shield',
+    type: 'buff',
+    description: 'Grants 90 seconds of protection from scorching hot terrain.',
+    terrainResist: 'hot',
+    resistSeconds: 90,
+    value: 35,
+  },
+  frostCloak: {
+    id: 'frostCloak',
+    name: 'Frost Cloak',
+    type: 'buff',
+    description: 'Grants 90 seconds of protection from freezing cold terrain.',
+    terrainResist: 'cold',
+    resistSeconds: 90,
+    value: 35,
+  },
+  bogSalve: {
+    id: 'bogSalve',
+    name: 'Bog Salve',
+    type: 'buff',
+    description: 'Grants 90 seconds of immunity to swamp slowdown.',
+    terrainResist: 'swamp',
+    resistSeconds: 90,
+    value: 30,
+  },
+  terrainCrystal: {
+    id: 'terrainCrystal',
+    name: 'Terrain Crystal',
+    type: 'buff',
+    description: 'A purified slime crystal. Grants 60 seconds of universal terrain resistance.',
+    terrainResist: 'all',
+    resistSeconds: 60,
+    value: 45,
   },
 
   // -------------------------------------------------------------------------
@@ -429,6 +554,55 @@ export const ITEMS: Record<string, Item> = {
     description: 'A slow, heavy heartbeat still echoes within.',
     value: 130,
   },
+
+  // -------------------------------------------------------------------------
+  // Boss cores — consumed to learn a boss skill or gain permanent stats
+  // -------------------------------------------------------------------------
+  tyrantCore: {
+    id: 'tyrantCore',
+    name: "Tyrant's Essence",
+    type: 'bossCore',
+    description: 'Absorb the Bone Tyrant\'s necrotic power. Grants Shadow Bolt, or +10 DEF & MDEF.',
+    grantSkillId: 'shadowBolt',
+    fallbackStatBonus: { def: 10, mdef: 10 },
+    value: 0,
+  },
+  queenCore: {
+    id: 'queenCore',
+    name: "Queen's Resonance",
+    type: 'bossCore',
+    description: 'Channel the Crystal Queen\'s arcane frequency. Grants Crystal Shatter, or +10 MATK.',
+    grantSkillId: 'crystalShatter',
+    fallbackStatBonus: { matk: 10 },
+    value: 0,
+  },
+  wyrmCore: {
+    id: 'wyrmCore',
+    name: "Wyrm's Flame Sac",
+    type: 'bossCore',
+    description: 'Consume the Inferno Wyrm\'s volatile core. Grants Inferno Breath, or +12 ATK.',
+    grantSkillId: 'infernoBreath',
+    fallbackStatBonus: { atk: 12 },
+    value: 0,
+  },
+  monarchCore: {
+    id: 'monarchCore',
+    name: "Monarch's Frost Heart",
+    type: 'bossCore',
+    description: 'Drink in the Frost Monarch\'s glacial power. Grants Blizzard, or +12 MDEF & +15 MaxMP.',
+    grantSkillId: 'blizzard',
+    fallbackStatBonus: { mdef: 12, maxMp: 15 },
+    value: 0,
+  },
+  boglordCore: {
+    id: 'boglordCore',
+    name: "Boglord's Spore Sac",
+    type: 'bossCore',
+    description: 'Inhale the Boglord\'s toxic essence. Grants Toxic Cloud, or +20 MaxHP & +10 MaxMP.',
+    grantSkillId: 'toxicCloud',
+    fallbackStatBonus: { maxHp: 20, maxMp: 10 },
+    value: 0,
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -527,6 +701,18 @@ export const RECIPES: CraftingRecipe[] = [
       { itemId: 'sporePod', qty: 2 },
     ],
     goldCost: 40,
+  },
+  {
+    id: 'craftTerrainCrystal',
+    name: 'Terrain Crystal',
+    description: 'Purified slime gel crystallized into a universal terrain ward.',
+    resultItemId: 'terrainCrystal',
+    resultQty: 1,
+    materials: [
+      { itemId: 'slimeGel', qty: 3 },
+      { itemId: 'golemCore', qty: 1 },
+    ],
+    goldCost: 18,
   },
 ];
 
@@ -674,6 +860,24 @@ function stats(partial: Partial<Stats>): Stats {
     ...partial,
   };
 }
+
+/** Skills that get injected into enemies spawned on floor 4+, keyed by enemy ID. */
+export const FLOOR4_ENEMY_SKILLS: Record<string, string> = {
+  skeletonWarrior: 'shadowBolt',
+  ghost: 'shadowBolt',
+  stoneGolem: 'earthquake',
+  crystalSpider: 'crystalBurst',
+  bat: 'crystalBurst',
+  fireElemental: 'fireball',
+  lavaGolem: 'fireball',
+  flameLizard: 'fireball',
+  iceWolf: 'iceSpear',
+  frostSpirit: 'iceSpear',
+  snowGolem: 'iceSpear',
+  giantFrog: 'poisonStrike',
+  poisonSnake: 'poisonStrike',
+  mushroomMonster: 'poisonStrike',
+};
 
 export const ENEMIES: Record<string, EnemyTemplate> = {
   skeletonWarrior: {
@@ -844,68 +1048,83 @@ export const ENEMIES: Record<string, EnemyTemplate> = {
     color: '#b25fae',
     lootTable: [{ itemId: 'sporePod', chance: 0.6, min: 1, max: 2 }],
   },
-  // Bosses — always drop a Dungeon Key (handled in combat resolution) plus a rare trophy material.
+  // Bosses — always drop a Dungeon Key + their trophy + their core.
   boneTyrant: {
     id: 'boneTyrant',
     name: 'Bone Tyrant',
-    baseStats: stats({ hp: 130, maxHp: 130, atk: 14, def: 8, mdef: 6, spd: 7 }),
+    baseStats: stats({ hp: 130, maxHp: 130, atk: 14, def: 8, mdef: 6, spd: 7, mp: 40, maxMp: 40 }),
     xpReward: 120,
     goldReward: 90,
     weakness: 'holy',
-    skillIds: [],
+    skillIds: ['shadowBolt'],
     color: '#e8e0c8',
     isBoss: true,
-    lootTable: [{ itemId: 'tyrantSkull', chance: 1, min: 1, max: 1 }],
+    lootTable: [
+      { itemId: 'tyrantSkull', chance: 1, min: 1, max: 1 },
+      { itemId: 'tyrantCore', chance: 1, min: 1, max: 1 },
+    ],
   },
   crystalQueen: {
     id: 'crystalQueen',
     name: 'Crystal Queen',
-    baseStats: stats({ hp: 150, maxHp: 150, atk: 12, matk: 14, def: 6, spd: 9 }),
+    baseStats: stats({ hp: 150, maxHp: 150, atk: 12, matk: 14, def: 6, spd: 9, mp: 50, maxMp: 50 }),
     xpReward: 140,
     goldReward: 110,
     weakness: 'fire',
-    skillIds: [],
+    skillIds: ['crystalShatter'],
     color: '#7fe3f0',
     isBoss: true,
-    lootTable: [{ itemId: 'queenShard', chance: 1, min: 1, max: 1 }],
+    lootTable: [
+      { itemId: 'queenShard', chance: 1, min: 1, max: 1 },
+      { itemId: 'queenCore', chance: 1, min: 1, max: 1 },
+    ],
   },
   infernoWyrm: {
     id: 'infernoWyrm',
     name: 'Inferno Wyrm',
-    baseStats: stats({ hp: 180, maxHp: 180, atk: 17, matk: 12, def: 9, spd: 8 }),
+    baseStats: stats({ hp: 180, maxHp: 180, atk: 17, matk: 12, def: 9, spd: 8, mp: 55, maxMp: 55 }),
     xpReward: 170,
     goldReward: 140,
     weakness: 'ice',
     resist: 'fire',
-    skillIds: [],
+    skillIds: ['infernoBreath'],
     color: '#ff5a29',
     isBoss: true,
-    lootTable: [{ itemId: 'wyrmScale', chance: 1, min: 1, max: 1 }],
+    lootTable: [
+      { itemId: 'wyrmScale', chance: 1, min: 1, max: 1 },
+      { itemId: 'wyrmCore', chance: 1, min: 1, max: 1 },
+    ],
   },
   frostMonarch: {
     id: 'frostMonarch',
     name: 'Frost Monarch',
-    baseStats: stats({ hp: 200, maxHp: 200, atk: 16, matk: 16, def: 10, spd: 9 }),
+    baseStats: stats({ hp: 200, maxHp: 200, atk: 16, matk: 16, def: 10, spd: 9, mp: 60, maxMp: 60 }),
     xpReward: 200,
     goldReward: 170,
     weakness: 'fire',
     resist: 'ice',
-    skillIds: [],
+    skillIds: ['blizzard'],
     color: '#bfe9ff',
     isBoss: true,
-    lootTable: [{ itemId: 'monarchCrown', chance: 1, min: 1, max: 1 }],
+    lootTable: [
+      { itemId: 'monarchCrown', chance: 1, min: 1, max: 1 },
+      { itemId: 'monarchCore', chance: 1, min: 1, max: 1 },
+    ],
   },
   boglord: {
     id: 'boglord',
     name: 'The Boglord',
-    baseStats: stats({ hp: 220, maxHp: 220, atk: 18, def: 11, spd: 6 }),
+    baseStats: stats({ hp: 220, maxHp: 220, atk: 18, def: 11, spd: 6, mp: 50, maxMp: 50 }),
     xpReward: 230,
     goldReward: 200,
     weakness: 'fire',
-    skillIds: [],
+    skillIds: ['toxicCloud'],
     color: '#3f7a3f',
     isBoss: true,
-    lootTable: [{ itemId: 'boglordHeart', chance: 1, min: 1, max: 1 }],
+    lootTable: [
+      { itemId: 'boglordHeart', chance: 1, min: 1, max: 1 },
+      { itemId: 'boglordCore', chance: 1, min: 1, max: 1 },
+    ],
   },
 };
 
@@ -977,5 +1196,5 @@ export const STARTING_EQUIPMENT: Record<string, Equipment | undefined> = {
 
 export const LOOT_EQUIPMENT_POOL = Object.values(EQUIPMENT);
 export const LOOT_ITEM_POOL = Object.values(ITEMS).filter(
-  (i) => i.type !== 'key',
+  (i) => i.type !== 'key' && i.type !== 'bossCore',
 );

@@ -3,6 +3,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react'
 import { useGameStore } from '../store';
 import { useKeyboardMove } from '../useKeyboardMove';
 import { useMobWander } from '../useMobWander';
+import { useTerrainTick } from '../useTerrainTick';
 import { DungeonCanvas } from './DungeonCanvas';
 import { HUD } from './HUD';
 import { BattleOverlay } from './BattleOverlay';
@@ -15,7 +16,6 @@ import { GameOverScreen, VictoryScreen } from './EndScreens';
 function DPad() {
   const movePlayer = useGameStore((s) => s.movePlayer);
 
-  // Fire move immediately on press, then repeat while held.
   function useDirButton(dx: number, dy: number) {
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
@@ -90,7 +90,7 @@ function DPadBtn({
   );
 }
 
-// ── Interact button (Space/E equivalent for mobile) ───────────────────────────
+// ── Interact button ────────────────────────────────────────────────────────────
 function InteractBtn() {
   const openChest = useGameStore((s) => s.openChest);
   const interactShop = useGameStore((s) => s.interactShop);
@@ -137,6 +137,8 @@ export default function GamePage() {
   const isExploring = mode === 'exploring';
   useKeyboardMove(isExploring);
   useMobWander(isExploring);
+  // Terrain timer only ticks while exploring (not during battles)
+  useTerrainTick(isExploring);
 
   const isShopMessage = message === '__SHOP__';
 
@@ -169,19 +171,14 @@ export default function GamePage() {
             </div>
           )}
 
-          {/* Touch controls — shown only while exploring on touch-capable devices.
-              CSS "hover: none" media query targets touch-primary devices reliably. */}
           {mode === 'exploring' && (
             <>
-              <div
-                className="pointer-events-none absolute inset-x-0 bottom-3 z-20 hidden justify-center sm:flex"
-              >
+              <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 hidden justify-center sm:flex">
                 <div className="rounded-md border border-card-border bg-card/70 px-4 py-1.5 text-[11px] text-muted-foreground backdrop-blur">
                   Move: Arrows/WASD &nbsp;·&nbsp; Interact: Space / E
                 </div>
               </div>
 
-              {/* Mobile D-pad — only visible on touch devices (pointer: coarse) */}
               <div className="pointer-events-auto absolute bottom-4 left-4 z-20 [display:none] [@media(pointer:coarse)]:block">
                 <DPad />
               </div>

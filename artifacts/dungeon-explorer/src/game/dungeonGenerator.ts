@@ -1,4 +1,4 @@
-import { ENEMIES, THEMES } from './gameData';
+import { ENEMIES, FLOOR4_ENEMY_SKILLS, THEMES } from './gameData';
 import type {
   DungeonLevel,
   DungeonRoom,
@@ -90,12 +90,23 @@ function spawnEnemy(enemyId: string, floor: number): EnemyInstance {
     mp: template.baseStats.mp,
     maxMp: template.baseStats.maxMp,
   };
+
+  // On floor 4+, inject an elemental skill into regular (non-boss) enemies.
+  let skillIds = [...template.skillIds];
+  if (floor >= 4 && !template.isBoss) {
+    const extraSkill = FLOOR4_ENEMY_SKILLS[enemyId];
+    if (extraSkill && !skillIds.includes(extraSkill)) {
+      skillIds = [...skillIds, extraSkill];
+    }
+  }
+
   return {
     ...template,
     instanceId: `${enemyId}-${Math.random().toString(36).slice(2, 9)}`,
     stats,
     defending: false,
     level: floor,
+    skillIds,
   };
 }
 
@@ -108,8 +119,6 @@ function findBossDoorTile(
   grid: Tile[][],
   bossRoom: DungeonRoom,
 ): { x: number; y: number } | null {
-  // Walk the perimeter of the boss room and look one tile further out in each
-  // cardinal direction — those are the corridor tiles connecting it to the rest.
   const candidates: { x: number; y: number }[] = [];
 
   // Top and bottom edges
@@ -128,8 +137,36 @@ function findBossDoorTile(
   }
 
   if (candidates.length === 0) return null;
-  // Pick the candidate closest to the middle of the list for a stable position.
   return candidates[Math.floor(candidates.length / 2)]!;
+}
+
+/** Scatter elemental terrain tiles across non-boss, non-shop rooms for themed floors. */
+function scatterTerrainTiles(
+  grid: Tile[][],
+  rooms: DungeonRoom[],
+  terrainType: TileType,
+  count: number,
+) {
+  const candidates: { x: number; y: number }[] = [];
+  for (const room of rooms) {
+    if (room.isBossRoom || room.isShopRoom) continue;
+    for (let y = room.y; y < room.y + room.h; y++) {
+      for (let x = room.x; x < room.x + room.w; x++) {
+        if (grid[y]?.[x]?.type === 'floor') {
+          candidates.push({ x, y });
+        }
+      }
+    }
+  }
+  // Shuffle and pick `count` tiles
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j]!, candidates[i]!];
+  }
+  for (let i = 0; i < Math.min(count, candidates.length); i++) {
+    const { x, y } = candidates[i]!;
+    grid[y]![x]!.type = terrainType;
+  }
 }
 
 export function generateDungeonLevel(floor: number): DungeonLevel {
@@ -185,8 +222,6 @@ export function generateDungeonLevel(floor: number): DungeonLevel {
   }
 
   // ── Boss room door ──────────────────────────────────────────────────────────
-  // Place a locked door on the corridor tile just outside the boss room.
-  // It turns walkable once all regular mobs on this floor are defeated.
   const bossDoorTile = findBossDoorTile(grid, endRoom);
   if (bossDoorTile) {
     grid[bossDoorTile.y]![bossDoorTile.x]!.type = 'lockedDoor';
@@ -259,6 +294,17 @@ export function generateDungeonLevel(floor: number): DungeonLevel {
     grid[stairsSpot.y]![stairsSpot.x]!.type = 'stairsDown';
   }
 
+  // ── Elemental terrain tiles ─────────────────────────────────────────────────
+  // Scatter per-theme terrain tiles so the floor feels hazardous and unique.
+  const terrainCount = randInt(5, 9);
+  if (theme.id === 'lavaCavern') {
+    scatterTerrainTiles(grid, rooms, 'lavaTile', terrainCount);
+  } else if (theme.id === 'frozenCatacombs') {
+    scatterTerrainTiles(grid, rooms, 'iceTile', terrainCount);
+  } else if (theme.id === 'undergroundSwamp') {
+    scatterTerrainTiles(grid, rooms, 'mudTile', terrainCount);
+  }
+
   const startCenter = roomCenter(startRoom);
 
   return {
@@ -276,7 +322,10 @@ export function generateDungeonLevel(floor: number): DungeonLevel {
 }
 
 export function tileTypeIsWalkable(type: TileType): boolean {
-  return type !== 'wall' && type !== 'lockedDoor';
+  return (
+    type !== 'wall' &&
+    type !== 'lockedDoor'
+  );
 }
 
 // BFS outward from `origin` for the nearest tile that is a plain, unoccupied floor.

@@ -4,12 +4,11 @@ import type { Equipment, EquipSlot, Stats } from '../types';
 
 const SLOTS: EquipSlot[] = ['weapon', 'armor', 'accessory'];
 const STAT_LABELS: Record<string, string> = {
-  hp: 'HP', maxHp: 'HP', mp: 'MP', maxMp: 'MP',
+  hp: 'HP', maxHp: 'Max HP', mp: 'MP', maxMp: 'Max MP',
   atk: 'ATK', def: 'DEF', matk: 'MATK', mdef: 'MDEF', spd: 'SPD', luck: 'LUK',
 };
 const ALLOCATABLE_STATS: (keyof Stats)[] = ['maxHp', 'maxMp', 'atk', 'def', 'matk', 'mdef', 'spd', 'luck'];
 
-/** Two spare-gear pieces that can be merged (same id + same upgradeLevel). */
 interface MergeGroup {
   eq1: Equipment;
   eq2: Equipment;
@@ -62,7 +61,7 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
             .filter((k) => !['hp', 'mp'].includes(k))
             .map((key) => (
               <div key={key} className="flex flex-col">
-                <span className="text-muted-foreground">{STAT_LABELS[key]}</span>
+                <span className="text-muted-foreground">{STAT_LABELS[key] ?? key}</span>
                 <span className="font-mono font-medium text-foreground">{stats[key]}</span>
               </div>
             ))}
@@ -82,7 +81,7 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
                   onClick={() => allocateStatPoint(stat)}
                   className="rounded-md border border-amber-400/40 bg-background/40 px-2 py-1.5 text-xs font-medium text-foreground hover-elevate active-elevate-2"
                 >
-                  +1 {STAT_LABELS[stat]}
+                  +1 {STAT_LABELS[stat] ?? stat}
                 </button>
               ))}
             </div>
@@ -151,7 +150,7 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
               ))}
             </div>
 
-            {/* Merge section — appears only when mergeable pairs exist */}
+            {/* Merge section */}
             {mergeGroups.length > 0 && (
               <div className="mt-3 rounded-lg border border-secondary/30 bg-secondary/10 p-3">
                 <h4 className="mb-2 font-serif text-xs font-semibold text-secondary">
@@ -186,26 +185,45 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
               <div className="text-xs text-muted-foreground">Your pack is empty.</div>
             )}
             {player.inventory.map((stack) => {
+              const item = stack.item;
+              const isBossCore = item.type === 'bossCore';
+              const isTerrainResist = !!item.terrainResist;
               const usableOutsideBattle =
-                stack.item.type === 'heal' || !!stack.item.mpAmount || !!stack.item.buffStat;
+                item.type === 'heal' || !!item.mpAmount || !!item.buffStat || isBossCore || isTerrainResist;
+
               return (
                 <div
-                  key={stack.item.id}
-                  className="flex items-center justify-between rounded-md border border-card-border bg-background/40 px-3 py-2 text-xs"
+                  key={item.id}
+                  className={`flex items-center justify-between rounded-md border px-3 py-2 text-xs ${
+                    isBossCore
+                      ? 'border-primary/40 bg-primary/5'
+                      : isTerrainResist
+                        ? 'border-chart-5/30 bg-chart-5/5'
+                        : 'border-card-border bg-background/40'
+                  }`}
                 >
-                  <div>
-                    <div className="font-medium text-foreground">{stack.item.name}</div>
-                    <div className="text-muted-foreground">{stack.item.description}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-foreground flex items-center gap-1">
+                      {isBossCore && <span className="text-primary">★</span>}
+                      {item.name}
+                    </div>
+                    <div className="text-muted-foreground truncate">{item.description}</div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2 pl-2">
                     <span className="text-muted-foreground">x{stack.quantity}</span>
                     {usableOutsideBattle && (
                       <button
                         type="button"
-                        onClick={() => useItem(stack.item.id)}
-                        className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover-elevate active-elevate-2"
+                        onClick={() => useItem(item.id)}
+                        className={`rounded-md border px-2 py-1 text-xs font-medium hover-elevate active-elevate-2 ${
+                          isBossCore
+                            ? 'border-primary/40 bg-primary/10 text-primary'
+                            : isTerrainResist
+                              ? 'border-chart-5/40 bg-chart-5/10 text-chart-5'
+                              : 'border-primary/40 bg-primary/10 text-primary'
+                        }`}
                       >
-                        Use
+                        {isBossCore ? 'Absorb' : isTerrainResist ? 'Apply' : 'Use'}
                       </button>
                     )}
                   </div>

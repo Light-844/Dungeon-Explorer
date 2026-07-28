@@ -31,7 +31,7 @@ export interface Skill {
   healAmount?: number;
 }
 
-export type ItemType = 'heal' | 'buff' | 'attack' | 'key' | 'material' | 'revive';
+export type ItemType = 'heal' | 'buff' | 'attack' | 'key' | 'material' | 'revive' | 'bossCore';
 
 export interface Item {
   id: string;
@@ -45,6 +45,13 @@ export interface Item {
   damage?: number;
   element?: Element;
   value: number;
+  /** If set, consuming this item grants terrain resistance for `resistSeconds`. */
+  terrainResist?: 'hot' | 'cold' | 'swamp' | 'all';
+  resistSeconds?: number;
+  /** Boss core only: the skill ID granted on consume (if not already learned). */
+  grantSkillId?: string;
+  /** Boss core only: stat bonus applied if the skill is already known. */
+  fallbackStatBonus?: Partial<Record<keyof Stats, number>>;
 }
 
 export interface InventoryStack {
@@ -135,7 +142,10 @@ export type TileType =
   | 'triggeredTrap'
   | 'shop'
   | 'enemy'
-  | 'start';
+  | 'start'
+  | 'lavaTile'
+  | 'iceTile'
+  | 'mudTile';
 
 export interface Tile {
   type: TileType;
