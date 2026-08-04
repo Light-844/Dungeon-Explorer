@@ -1,0 +1,186 @@
+Implement a complete hero class selection and progression system for Dungeon Explorer with 4 distinct classes, baseline attributes, starter gear, and special abilities.
+
+Requirements:
+
+CLASS DEFINITIONS & BASE STATS:
+Create a classes.config.ts or classes.json file with complete class definitions:
+
+1. WARRIOR
+   - Role: Master of Melee Combat & Heavy Defense
+   - Base Vitals: 120 HP | 30 Mana
+   - Attributes: STR 14 | DEX 10 | INT 8 | CON 14
+   - Starter Weapon: Iron Longsword
+   - Color Theme: Steel Blue / Silver
+
+2. ARCANE MAGE
+   - Role: Wielder of Elemental Fire & Ice Magic
+   - Base Vitals: 75 HP | 100 Mana
+   - Attributes: STR 8 | DEX 10 | INT 16 | CON 10
+   - Starter Weapon: Apprentice Wand
+   - Color Theme: Purple / Arcane Blue
+
+3. SHADOW ROGUE
+   - Role: Lethal Agility, Critical Precision & Mobility
+   - Base Vitals: 90 HP | 50 Mana
+   - Attributes: STR 10 | DEX 16 | INT 10 | CON 11
+   - Starter Weapon: Twin Daggers
+   - Color Theme: Dark Purple / Shadow Black
+
+4. HOLY PALADIN
+   - Role: Divine Guardian, Smiter & Sustained Healer
+   - Base Vitals: 110 HP | 70 Mana
+   - Attributes: STR 12 | DEX 9 | INT 12 | CON 13
+   - Starter Weapon: War Hammer
+   - Color Theme: Gold / Holy White
+
+ATTRIBUTE SYSTEM:
+Implement attribute scaling in Zustand store:
+- Strength (STR): +1.2 Attack damage per point
+- Dexterity (DEX): +0.8% Critical Hit Chance per point
+- Intelligence (INT): +8 Max Mana per point
+- Constitution (CON): +8 Max HP per point, +0.8 Defense per point
+
+Apply attributes on level-up automatically:
+- Each level grants +1 point distributed by class base attributes (proportional increase)
+- Example: Warrior levels 2 → 3: +2 STR, +1 CON, recalculate Attack and Defense values
+- Loot/equipment should modify attributes (e.g., Sword of Strength: +2 STR)
+
+SPECIAL ABILITIES:
+Implement ability system with class-specific abilities:
+
+WARRIOR ABILITIES:
+1. Whirlwind Strike
+   - Effect: Slashes all adjacent monsters simultaneously
+   - Damage: 140% physical damage (based on STR)
+   - Cost: 10 MP | Range: 1 Tile Radius (hits all enemies in adjacent tiles)
+   - Animation: Spinning slash with sword
+   - Sound: Metallic whoosh sound
+
+2. Shield Bash
+   - Effect: Bashes target enemy, inflicts heavy blunt damage & stuns
+   - Damage: 120% physical damage
+   - Status: Stun (enemy loses next turn)
+   - Cost: 15 MP | Range: 1 Tile (melee range)
+   - Animation: Shield raised then slams forward
+   - Sound: Heavy impact sound
+
+ARCANE MAGE ABILITIES:
+1. Fireball
+   - Effect: Launches fiery sphere at long range
+   - Damage: 220% spell damage (based on INT)
+   - Cost: 20 MP | Range: 4 Tiles (can target distant enemies)
+   - Animation: Ball of fire projectile traveling across screen
+   - Sound: Explosive fire sound
+   - Impact: Explosion effect on target
+
+2. Frost Nova
+   - Effect: Erupts in icy shockwave, freezes all enemies
+   - Damage: 150% area ice damage (based on INT)
+   - Status: Freeze (enemy movement reduced, slow action)
+   - Cost: 25 MP | Range: 2 Tile Radius (hits all enemies within area)
+   - Animation: Icy explosion from caster outward
+   - Sound: Crackling ice sound
+   - Visual: Blue/white frost particle effect
+
+SHADOW ROGUE ABILITIES:
+1. Shadow Strike
+   - Effect: Swift strike guaranteed to trigger Critical Hit
+   - Damage: 250% damage (guaranteed crit, based on STR & DEX)
+   - Cost: 15 MP | Range: 1 Tile (melee)
+   - Animation: Quick dash forward with dagger strike
+   - Sound: Quick metallic slash
+   - Effect: Always deals critical damage (ignores RNG for this ability)
+
+2. Shadow Step
+   - Effect: Instantly teleport to escape or reposition
+   - Cost: 20 MP | Range: 3 Tiles (teleport in facing direction)
+   - Animation: Rogue fades to shadow and reappears
+   - Sound: Whoosh/shadow sound
+   - Tactical: Can dodge incoming attacks or escape from enemies
+
+HOLY PALADIN ABILITIES:
+1. Holy Smite
+   - Effect: Strikes monster with divine radiant energy
+   - Damage: 180% holy damage (based on STR & INT)
+   - Cost: 15 MP | Range: 1 Tile (melee)
+   - Animation: Weapon glows with holy light, strike
+   - Sound: Holy chime/radiant sound
+   - Visual: Gold light burst on impact
+
+2. Divine Light
+   - Effect: Channels holy grace to restore health (self-heal or group heal)
+   - Healing: 40% of Max HP restored
+   - Cost: 30 MP | Range: Self (or all nearby allies if group combat added)
+   - Animation: Holy light surrounds character, health bars fill
+   - Sound: Soothing healing chime
+   - Visual: Golden particles around character
+
+HERO SELECTION SCREEN:
+Create a hero selection UI component:
+- Display all 4 classes with:
+  - Class name, role description (1-2 sentences)
+  - Character portrait/sprite (visual distinct representation)
+  - Base stats: HP, Mana, STR, DEX, INT, CON
+  - Special abilities list with descriptions (2 abilities shown)
+  - Starter weapon display
+- Selection method: Click on class card to select
+- Shows comparison: Hover over stat shows tooltip explanation
+- Selected class highlighted with border/glow effect
+- "Start Game" button becomes active after selection
+- Confirm selection: "Begin as [Class Name]" button
+
+CLASS-SPECIFIC GAMEPLAY:
+Implement class-specific balance and playstyle:
+- Warrior: Tank/DPS hybrid - can take hits and deal consistent damage
+- Mage: Glass cannon - low HP but high damage, mana management important
+- Rogue: High DPS/mobility - critical hits, escape abilities
+- Paladin: Support/tank - healing, defensive abilities, balanced stats
+
+Zustand Store Updates:
+Add to game store:
+- selectedClass: string (warrior | mage | rogue | paladin)
+- classAttributes: { STR, DEX, INT, CON } (current values)
+- currentAbilities: Array<Ability> (selected class's abilities)
+- baseStats: { HP, Mana } (per class)
+- starterGear: { weapon, armor } (per class)
+
+Combat Integration:
+- Ability selection: Show only selected class's abilities in combat menu
+- Damage calculation: Apply STR/INT to ability damage
+- Critical hits: Calculate based on DEX + equipment
+- Mana costs: Display and track ability mana costs
+- Cooldowns: Abilities can have cooldowns (optional: add cooldown system)
+
+Leveling & Growth:
+When player levels up:
+- Add experience to each attribute based on class growth curve
+- Recalculate all stats (HP, Mana, Attack, Defense, Crit Chance)
+- Show notification: "Warrior leveled up! +2 STR, +1 CON"
+- Update character sheet immediately
+
+Equipment & Attribute Bonuses:
+- Starter gear provides baseline stats
+- Loot drops with attribute bonuses (e.g., "Sword +3 STR")
+- Equipment screen shows current attributes + bonuses from gear
+- Visual indicator for stat boost (green arrow, +X display)
+
+Tutorial Integration:
+Include class selection and ability explanation in tutorial:
+- "Choose your hero class to begin your adventure"
+- First combat turn: "Use [Ability Name] by clicking the ability button"
+- Show what each ability does before using in combat
+- Highlight the class's abilities in first fight
+
+Testing Checklist:
+- ✓ All 4 classes selectable
+- ✓ Base stats correct for each class
+- ✓ Abilities display correctly with costs and ranges
+- ✓ Attribute scaling works (leveling increases stats properly)
+- ✓ Damage calculation reflects class attributes
+- ✓ Mana costs enforced (can't use ability if mana < cost)
+- ✓ Critical hit chance increases with DEX
+- ✓ HP increases with CON level-ups
+- ✓ Different class playstyles feel distinct
+- ✓ Balance check: No class trivializes gameplay
+- ✓ Mobile: Class selection works on portrait/landscape
+- ✓ Persistence: Selected class saved to localStorage

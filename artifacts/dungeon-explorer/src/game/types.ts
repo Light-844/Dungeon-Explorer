@@ -17,6 +17,13 @@ export type Element = 'fire' | 'ice' | 'lightning' | 'earth' | 'holy' | 'poison'
 
 export type SkillType = 'physical' | 'magic' | 'support';
 
+export interface ClassAttributes {
+  str: number;
+  dex: number;
+  int: number;
+  con: number;
+}
+
 export interface Skill {
   id: string;
   name: string;
@@ -29,6 +36,12 @@ export interface Skill {
   target: 'enemy' | 'self' | 'allEnemies';
   statBuff?: Partial<Record<keyof Stats, number>>;
   healAmount?: number;
+  /** If set, heals this fraction of the player's max HP (e.g. 0.4 = 40%). */
+  healPercent?: number;
+  /** If true, this physical skill always deals a critical hit (e.g. Shadow Strike). */
+  guaranteedCrit?: boolean;
+  /** If true, using this skill in battle guarantees a successful escape (e.g. Shadow Step). */
+  guaranteedFlee?: boolean;
 }
 
 export type ItemType = 'heal' | 'buff' | 'attack' | 'key' | 'material' | 'revive' | 'bossCore';
@@ -182,6 +195,9 @@ export interface DungeonLevel {
 
 export interface PlayerCharacter {
   name: string;
+  gender: 'male' | 'female';
+  heroClass: string;
+  classAttributes: ClassAttributes;
   level: number;
   xp: number;
   xpToNext: number;

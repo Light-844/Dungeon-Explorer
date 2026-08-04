@@ -114,30 +114,58 @@ export function pickTheme(floor: number): DungeonTheme {
   return THEMES[(floor - 1) % THEMES.length]!;
 }
 
-/** Find a corridor tile just outside the boss room to use as the locked door. */
-function findBossDoorTile(
+/**
+ * Seal EVERY floor tile on the perimeter outside the boss room to walls,
+ * except for one — which becomes the single locked-door gate.
+ *
+ * Rooms are sorted left-to-right so the chain corridor from the previous room
+ * enters from the LEFT edge. We prefer a left-edge candidate so the gate
+ * sits at the natural approach to the boss room.
+ */
+function sealBossRoomToSingleEntry(
   grid: Tile[][],
   bossRoom: DungeonRoom,
 ): { x: number; y: number } | null {
-  const candidates: { x: number; y: number }[] = [];
+  const leftEdge: { x: number; y: number }[] = [];
+  const otherEdges: { x: number; y: number }[] = [];
 
-  // Top and bottom edges
-  for (let x = bossRoom.x; x < bossRoom.x + bossRoom.w; x++) {
-    const above = grid[bossRoom.y - 1]?.[x];
-    if (above && above.type === 'floor') candidates.push({ x, y: bossRoom.y - 1 });
-    const below = grid[bossRoom.y + bossRoom.h]?.[x];
-    if (below && below.type === 'floor') candidates.push({ x, y: bossRoom.y + bossRoom.h });
-  }
-  // Left and right edges
+  // Left edge — preferred because rooms are sorted ascending on X
   for (let y = bossRoom.y; y < bossRoom.y + bossRoom.h; y++) {
-    const left = grid[y]?.[bossRoom.x - 1];
-    if (left && left.type === 'floor') candidates.push({ x: bossRoom.x - 1, y });
-    const right = grid[y]?.[bossRoom.x + bossRoom.w];
-    if (right && right.type === 'floor') candidates.push({ x: bossRoom.x + bossRoom.w, y });
+    const t = grid[y]?.[bossRoom.x - 1];
+    if (t && t.type === 'floor') leftEdge.push({ x: bossRoom.x - 1, y });
+  }
+  // Top edge
+  for (let x = bossRoom.x - 1; x <= bossRoom.x + bossRoom.w; x++) {
+    const t = grid[bossRoom.y - 1]?.[x];
+    if (t && t.type === 'floor') otherEdges.push({ x, y: bossRoom.y - 1 });
+  }
+  // Bottom edge
+  for (let x = bossRoom.x - 1; x <= bossRoom.x + bossRoom.w; x++) {
+    const t = grid[bossRoom.y + bossRoom.h]?.[x];
+    if (t && t.type === 'floor') otherEdges.push({ x, y: bossRoom.y + bossRoom.h });
+  }
+  // Right edge
+  for (let y = bossRoom.y; y < bossRoom.y + bossRoom.h; y++) {
+    const t = grid[y]?.[bossRoom.x + bossRoom.w];
+    if (t && t.type === 'floor') otherEdges.push({ x: bossRoom.x + bossRoom.w, y });
   }
 
-  if (candidates.length === 0) return null;
-  return candidates[Math.floor(candidates.length / 2)]!;
+  const all = [...leftEdge, ...otherEdges];
+  if (all.length === 0) return null;
+
+  // The gate: use the middle of the left-edge entries, or the middle of all if none on left
+  const gateSource = leftEdge.length > 0 ? leftEdge : all;
+  const chosen = gateSource[Math.floor(gateSource.length / 2)]!;
+
+  // Wall off every other perimeter entry — this enforces the single-entry rule
+  for (const c of all) {
+    if (c.x === chosen.x && c.y === chosen.y) continue;
+    grid[c.y]![c.x]!.type = 'wall';
+  }
+
+  // Mark the single gate as a locked door
+  grid[chosen.y]![chosen.x]!.type = 'lockedDoor';
+  return chosen;
 }
 
 /** Scatter elemental terrain tiles across non-boss, non-shop rooms for themed floors. */
@@ -221,11 +249,8 @@ export function generateDungeonLevel(floor: number): DungeonLevel {
     carveCorridor(grid, b.x, a.y, b.x, b.y);
   }
 
-  // ── Boss room door ──────────────────────────────────────────────────────────
-  const bossDoorTile = findBossDoorTile(grid, endRoom);
-  if (bossDoorTile) {
-    grid[bossDoorTile.y]![bossDoorTile.x]!.type = 'lockedDoor';
-  }
+  // ── Boss room — seal all perimeter entries except one locked gate ───────────
+  const bossDoorTile = sealBossRoomToSingleEntry(grid, endRoom);
 
   const enemies: Record<string, EnemyInstance> = {};
   let bossInstanceId: string | null = null;

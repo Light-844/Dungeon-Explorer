@@ -1,14 +1,14 @@
 import { create } from 'zustand';
 import {
-  BASE_PLAYER_STATS,
+  EQUIPMENT,
   ITEMS,
   LOOT_EQUIPMENT_POOL,
   LOOT_ITEM_POOL,
   RECIPES,
   SKILL_UNLOCK_ORDER,
   SKILLS,
-  STARTING_EQUIPMENT,
 } from './gameData';
+import { CLASSES } from './classData';
 import { generateDungeonLevel, tileTypeIsWalkable } from './dungeonGenerator';
 import {
   autoStatGainsForLevelUp,
@@ -43,23 +43,31 @@ function uid(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
-function freshPlayer(): PlayerCharacter {
+function freshPlayer(
+  name = 'Adventurer',
+  gender: 'male' | 'female' = 'male',
+  heroClass = 'warrior',
+): PlayerCharacter {
+  const cls = CLASSES[heroClass] ?? CLASSES.warrior!;
+  const weapon = EQUIPMENT[cls.starterWeaponId];
+  const armor  = EQUIPMENT[cls.starterArmorId];
+  const equipment: PlayerCharacter['equipment'] = {};
+  if (weapon) equipment.weapon  = cloneEquipmentInstance(weapon);
+  if (armor)  equipment.armor   = cloneEquipmentInstance(armor);
+
   return {
-    name: 'Adventurer',
+    name,
+    gender,
+    heroClass: cls.id,
+    classAttributes: { ...cls.attributes },
     level: 1,
     xp: 0,
     xpToNext: xpToNextLevel(1),
     gold: 30,
-    baseStats: { ...BASE_PLAYER_STATS },
-    equipment: Object.fromEntries(
-      Object.entries(STARTING_EQUIPMENT)
-        .filter(([, eq]) => !!eq)
-        .map(([slot, eq]) => [slot, cloneEquipmentInstance(eq as Equipment)]),
-    ) as PlayerCharacter['equipment'],
+    baseStats: { ...cls.baseStats },
+    equipment,
     equipmentInventory: [],
-    skillIds: SKILL_UNLOCK_ORDER.filter((s) => s.unlockLevel === 1).map(
-      (s) => s.id,
-    ),
+    skillIds: [...cls.startingSkillIds],
     inventory: [{ item: ITEMS.smallPotion!, quantity: 3 }],
     statPoints: 0,
   };
@@ -112,7 +120,7 @@ interface GameState {
   /** Move cooldown deadline (ms) for swamp slow. 0 = free to move. */
   swampMoveCooldownMs: number;
 
-  startNewGame: () => void;
+  startNewGame: (name: string, gender: 'male' | 'female', heroClass: string) => void;
   movePlayer: (dx: number, dy: number) => void;
   openChest: () => void;
   interactShop: () => void;
@@ -170,8 +178,8 @@ function pushLog(
 export const useGameStore = create<GameState>((set, get) => ({
   mode: 'title',
   player: freshPlayer(),
-  playerHp: BASE_PLAYER_STATS.hp,
-  playerMp: BASE_PLAYER_STATS.mp,
+  playerHp: 42,
+  playerMp: 18,
   dungeon: null,
   playerPos: { x: 0, y: 0 },
   facing: 'down',
@@ -185,8 +193,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   terrainDamageInterval: 0,
   swampMoveCooldownMs: 0,
 
-  startNewGame: () => {
-    const player = freshPlayer();
+  startNewGame: (name, gender, heroClass) => {
+    const player = freshPlayer(name, gender, heroClass);
     const dungeon = generateDungeonLevel(1);
     const stats = effectivePlayerStats(player);
     const def = stats.def;
@@ -563,7 +571,18 @@ export const useGameStore = create<GameState>((set, get) => ({
       const skill = SKILLS[payload.skillId];
       if (skill && skill.mpCost <= playerMp) {
         playerMp -= skill.mpCost;
-        if (skill.target === 'self') {
+
+        // ── Shadow Step — guaranteed escape ─────────────────────────────────
+        if (skill.guaranteedFlee) {
+          fled = true;
+          pushLog(battle, `You vanish into the shadows and escape the battle!`, 'system');
+        } else if (skill.target === 'self') {
+          // ── Percentage heal (e.g. Divine Light) ───────────────────────────
+          if (skill.healPercent) {
+            const healAmt = Math.round(playerStats.maxHp * skill.healPercent);
+            playerHp = Math.min(playerStats.maxHp, playerHp + healAmt);
+            pushLog(battle, `You cast ${skill.name} and restore ${healAmt} HP.`, 'heal');
+          }
           if (skill.healAmount) {
             playerHp = Math.min(playerStats.maxHp, playerHp + skill.healAmount);
             pushLog(battle, `You cast ${skill.name} and heal ${skill.healAmount} HP.`, 'heal');
@@ -589,12 +608,18 @@ export const useGameStore = create<GameState>((set, get) => ({
                     enemy.weakness,
                     enemy.resist,
                   )
-                : calcPhysicalDamage(playerStats.atk, enemy.stats.def, skill.power, playerStats.luck);
+                : calcPhysicalDamage(
+                    playerStats.atk,
+                    enemy.stats.def,
+                    skill.power,
+                    playerStats.luck,
+                    skill.guaranteedCrit,
+                  );
             enemy.stats = { ...enemy.stats, hp: Math.max(0, enemy.stats.hp - dmg.amount) };
             pushLog(
               battle,
-              `${skill.name} hits ${enemy.name} for ${dmg.amount}${dmg.isWeak ? ' (weak!)' : ''}.`,
-              'damage',
+              `${skill.name} hits ${enemy.name} for ${dmg.amount}${dmg.isWeak ? ' (weak!)' : dmg.isCrit ? ' (Critical!)' : ''}.`,
+              dmg.isWeak || dmg.isCrit ? 'crit' : 'damage',
             );
           });
         } else {
@@ -611,7 +636,13 @@ export const useGameStore = create<GameState>((set, get) => ({
                     target.weakness,
                     target.resist,
                   )
-                : calcPhysicalDamage(playerStats.atk, target.stats.def, skill.power, playerStats.luck);
+                : calcPhysicalDamage(
+                    playerStats.atk,
+                    target.stats.def,
+                    skill.power,
+                    playerStats.luck,
+                    skill.guaranteedCrit,
+                  );
             target.stats = { ...target.stats, hp: Math.max(0, target.stats.hp - dmg.amount) };
             pushLog(
               battle,
@@ -1095,7 +1126,7 @@ function grantXp(player: PlayerCharacter, xp: number): PlayerCharacter {
     curXp -= xpToNext;
     level += 1;
     xpToNext = xpToNextLevel(level);
-    const gains = autoStatGainsForLevelUp();
+    const gains = autoStatGainsForLevelUp(player.heroClass);
     for (const key of Object.keys(gains) as (keyof Stats)[]) {
       baseStats[key] = baseStats[key] + (gains[key] ?? 0);
     }

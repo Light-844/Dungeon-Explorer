@@ -11,7 +11,8 @@ export function computeEffectiveStats(
   return result;
 }
 
-export function rollCrit(luck: number): boolean {
+export function rollCrit(luck: number, forced = false): boolean {
+  if (forced) return true;
   const chance = 0.05 + Math.min(0.25, luck * 0.01);
   return Math.random() < chance;
 }
@@ -28,8 +29,9 @@ export function calcPhysicalDamage(
   defenderDef: number,
   power: number,
   luck: number,
+  forceCrit = false,
 ): DamageResult {
-  const isCrit = rollCrit(luck);
+  const isCrit = rollCrit(luck, forceCrit);
   const raw = Math.max(1, attackerAtk * power - defenderDef * 0.6);
   const variance = 0.9 + Math.random() * 0.2;
   const amount = Math.round(raw * variance * (isCrit ? 1.8 : 1));
@@ -88,12 +90,19 @@ export function xpToNextLevel(level: number): number {
   return Math.round(28 * Math.pow(level, 1.45));
 }
 
-/** Small automatic growth on level-up, on top of the freely allocatable stat points. */
-export function autoStatGainsForLevelUp(): Partial<Stats> {
-  return {
-    maxHp: 5,
-    maxMp: 2,
+/**
+ * Automatic stat growth on level-up (on top of free stat-points).
+ * Each class grows at a different rate; defaults to generic growth when
+ * no class is supplied (e.g. legacy saves).
+ */
+export function autoStatGainsForLevelUp(heroClass?: string): Partial<Stats> {
+  const table: Record<string, { maxHp: number; maxMp: number }> = {
+    warrior: { maxHp: 7, maxMp: 1 },
+    mage:    { maxHp: 3, maxMp: 5 },
+    rogue:   { maxHp: 5, maxMp: 2 },
+    paladin: { maxHp: 6, maxMp: 3 },
   };
+  return (heroClass && table[heroClass]) ?? { maxHp: 5, maxMp: 2 };
 }
 
 /** Points granted to the player on every level-up, freely assignable to any stat. */

@@ -173,6 +173,90 @@ export const SKILLS: Record<string, Skill> = {
   },
 
   // -------------------------------------------------------------------------
+  // Class abilities — granted at character creation by the chosen class
+  // -------------------------------------------------------------------------
+  whirlwindStrike: {
+    id: 'whirlwindStrike',
+    name: 'Whirlwind Strike',
+    type: 'physical',
+    mpCost: 10,
+    power: 1.4,
+    element: 'none',
+    description: 'Slash through all enemies simultaneously — 140% physical damage.',
+    unlockLevel: 99,
+    target: 'allEnemies',
+  },
+  shieldBash: {
+    id: 'shieldBash',
+    name: 'Shield Bash',
+    type: 'physical',
+    mpCost: 15,
+    power: 1.2,
+    element: 'none',
+    description: 'Slam the enemy with your shield — 120% physical damage.',
+    unlockLevel: 99,
+    target: 'enemy',
+  },
+  frostNova: {
+    id: 'frostNova',
+    name: 'Frost Nova',
+    type: 'magic',
+    mpCost: 25,
+    power: 1.5,
+    element: 'ice',
+    description: 'Erupt in an icy shockwave — 150% area ice damage to all enemies.',
+    unlockLevel: 99,
+    target: 'allEnemies',
+  },
+  shadowStrike: {
+    id: 'shadowStrike',
+    name: 'Shadow Strike',
+    type: 'physical',
+    mpCost: 15,
+    power: 2.5,
+    element: 'none',
+    description: 'A swift strike that always lands as a critical hit — 250% guaranteed damage.',
+    unlockLevel: 99,
+    target: 'enemy',
+    guaranteedCrit: true,
+  },
+  shadowStep: {
+    id: 'shadowStep',
+    name: 'Shadow Step',
+    type: 'support',
+    mpCost: 20,
+    power: 0,
+    element: 'none',
+    description: 'Fade into the shadows — guaranteed escape from any battle.',
+    unlockLevel: 99,
+    target: 'self',
+    guaranteedFlee: true,
+  },
+  holySmite: {
+    id: 'holySmite',
+    name: 'Holy Smite',
+    type: 'magic',
+    mpCost: 15,
+    power: 1.8,
+    element: 'holy',
+    description: 'Strike with radiant divine energy — 180% holy damage.',
+    unlockLevel: 99,
+    target: 'enemy',
+  },
+  divineLight: {
+    id: 'divineLight',
+    name: 'Divine Light',
+    type: 'support',
+    mpCost: 30,
+    power: 0,
+    element: 'holy',
+    description: 'Channel holy grace to restore 40% of your maximum HP.',
+    unlockLevel: 99,
+    target: 'self',
+    healPercent: 0.4,
+  },
+
+  // -------------------------------------------------------------------------
   // Boss skills — used by bosses in combat (also grantable via boss cores)
   // -------------------------------------------------------------------------
   shadowBolt: {
@@ -720,6 +804,65 @@ export const RECIPES: CraftingRecipe[] = [
 // Equipment
 // ---------------------------------------------------------------------------
 export const EQUIPMENT: Record<string, Equipment> = {
+  // ── Class starter weapons ─────────────────────────────────────────────────
+  ironLongsword: {
+    id: 'ironLongsword',
+    name: 'Iron Longsword',
+    slot: 'weapon',
+    statBonus: { atk: 8 },
+    description: 'A dependable longsword forged by a master smith.',
+    value: 40,
+  },
+  apprenticeWand: {
+    id: 'apprenticeWand',
+    name: 'Apprentice Wand',
+    slot: 'weapon',
+    statBonus: { matk: 10, maxMp: 8 },
+    description: 'A slender wand that amplifies arcane resonance.',
+    value: 35,
+  },
+  twinDaggers: {
+    id: 'twinDaggers',
+    name: 'Twin Daggers',
+    slot: 'weapon',
+    statBonus: { atk: 6, spd: 3, luck: 4 },
+    description: 'A matched pair of razor-sharp blades worn in each hand.',
+    value: 38,
+  },
+  warHammer: {
+    id: 'warHammer',
+    name: 'War Hammer',
+    slot: 'weapon',
+    statBonus: { atk: 9, def: 2 },
+    description: 'A blessed war hammer — heavy blows backed by holy weight.',
+    value: 42,
+  },
+  // ── Class starter armors ──────────────────────────────────────────────────
+  paddedVest: {
+    id: 'paddedVest',
+    name: 'Padded Vest',
+    slot: 'armor',
+    statBonus: { def: 3 },
+    description: 'Thick layers of padding absorb the worst of any blow.',
+    value: 12,
+  },
+  silkRobes: {
+    id: 'silkRobes',
+    name: 'Silk Robes',
+    slot: 'armor',
+    statBonus: { mdef: 4, matk: 1 },
+    description: 'Rune-threaded silk that channels magical energies.',
+    value: 12,
+  },
+  shadowLeathers: {
+    id: 'shadowLeathers',
+    name: 'Shadow Leathers',
+    slot: 'armor',
+    statBonus: { def: 2, spd: 1 },
+    description: 'Supple dark leather sewn for silent, swift movement.',
+    value: 12,
+  },
+  // ── Generic starter (fallback) ────────────────────────────────────────────
   rustySword: {
     id: 'rustySword',
     name: 'Rusty Sword',
