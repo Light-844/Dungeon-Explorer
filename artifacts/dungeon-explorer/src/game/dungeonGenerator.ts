@@ -241,10 +241,12 @@ export function generateDungeonLevel(floor: number): DungeonLevel {
       carveCorridor(grid, a.x, b.y, b.x, b.y);
     }
   }
-  // A couple of extra random links for loops
-  for (let i = 0; i < 2 && rooms.length > 3; i++) {
-    const a = roomCenter(randChoice(rooms));
-    const b = roomCenter(randChoice(rooms));
+  // A couple of extra random links for loops — exclude the boss room so we
+  // never carve an unexpected second path into it.
+  const nonBossRooms = rooms.filter((r) => !r.isBossRoom);
+  for (let i = 0; i < 2 && nonBossRooms.length > 3; i++) {
+    const a = roomCenter(randChoice(nonBossRooms));
+    const b = roomCenter(randChoice(nonBossRooms));
     carveCorridor(grid, a.x, a.y, b.x, a.y);
     carveCorridor(grid, b.x, a.y, b.x, b.y);
   }
@@ -311,6 +313,36 @@ export function generateDungeonLevel(floor: number): DungeonLevel {
     }
   });
 
+  // ── Reachability guard ──────────────────────────────────────────────────────
+  // Remove any non-boss enemy whose tile cannot be reached from the start
+  // without unlocking the boss door. This catches mobs that ended up on the
+  // wrong side of the seal due to corridor routing quirks.
+  const startCenter = roomCenter(startRoom);
+  {
+    const reachable = reachableWithoutBossKey(grid, startCenter, width, height);
+    // (startCenter is also reused below for the DungeonLevel startPos)
+    for (const [instanceId, _enemy] of Object.entries(enemies)) {
+      if (instanceId === bossInstanceId) continue; // boss is intentionally locked
+      // Find this enemy's tile
+      let found = false;
+      outer: for (let ey = 0; ey < height; ey++) {
+        for (let ex = 0; ex < width; ex++) {
+          if (grid[ey]![ex]!.enemyInstanceId === instanceId) {
+            if (!reachable.has(`${ex},${ey}`)) {
+              // Trapped — clear the tile and remove from the enemy record
+              grid[ey]![ex]!.type = 'floor';
+              grid[ey]![ex]!.enemyInstanceId = undefined;
+              delete enemies[instanceId];
+            }
+            found = true;
+            break outer;
+          }
+        }
+      }
+      if (!found) delete enemies[instanceId]; // orphaned record
+    }
+  }
+
   // Place stairs down in the room right before the boss room.
   const stairsRoom = rooms[Math.max(0, rooms.length - 2)]!;
   const stairsCenter = roomCenter(stairsRoom);
@@ -330,8 +362,6 @@ export function generateDungeonLevel(floor: number): DungeonLevel {
     scatterTerrainTiles(grid, rooms, 'mudTile', terrainCount);
   }
 
-  const startCenter = roomCenter(startRoom);
-
   return {
     floor,
     width,
@@ -344,6 +374,37 @@ export function generateDungeonLevel(floor: number): DungeonLevel {
     bossInstanceId,
     bossDoorPos: bossDoorTile ?? null,
   };
+}
+
+/**
+ * BFS flood-fill from `start`, treating `lockedDoor` (and walls) as impassable.
+ * Returns the set of tile keys ("x,y") reachable without the boss key.
+ */
+function reachableWithoutBossKey(
+  grid: Tile[][],
+  start: { x: number; y: number },
+  width: number,
+  height: number,
+): Set<string> {
+  const visited = new Set<string>();
+  const queue: { x: number; y: number }[] = [{ ...start }];
+  visited.add(`${start.x},${start.y}`);
+
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as const) {
+      const nx = cur.x + dx;
+      const ny = cur.y + dy;
+      if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+      const key = `${nx},${ny}`;
+      if (visited.has(key)) continue;
+      const t = grid[ny]?.[nx];
+      if (!t || t.type === 'wall' || t.type === 'lockedDoor') continue;
+      visited.add(key);
+      queue.push({ x: nx, y: ny });
+    }
+  }
+  return visited;
 }
 
 export function tileTypeIsWalkable(type: TileType): boolean {
