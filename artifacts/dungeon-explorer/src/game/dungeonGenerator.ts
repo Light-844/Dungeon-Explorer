@@ -229,10 +229,12 @@ export function generateDungeonLevel(floor: number): DungeonLevel {
 
   rooms.forEach((room) => carveRoom(grid, room));
 
-  // Connect rooms in order with corridors (simple chain + a few extra links)
-  for (let i = 0; i < rooms.length - 1; i++) {
-    const a = roomCenter(rooms[i]!);
-    const b = roomCenter(rooms[i + 1]!);
+  // Connect every room in one guaranteed main chain. The stairs room is chosen
+  // from this exact chain below, so extra maze links can never be its only route.
+  const mainCorridorChain = [...rooms];
+  for (let i = 0; i < mainCorridorChain.length - 1; i++) {
+    const a = roomCenter(mainCorridorChain[i]!);
+    const b = roomCenter(mainCorridorChain[i + 1]!);
     if (Math.random() < 0.5) {
       carveCorridor(grid, a.x, a.y, b.x, a.y);
       carveCorridor(grid, b.x, a.y, b.x, b.y);
@@ -343,10 +345,23 @@ export function generateDungeonLevel(floor: number): DungeonLevel {
     }
   }
 
-  // Place stairs down in the room right before the boss room.
-  const stairsRoom = rooms[Math.max(0, rooms.length - 2)]!;
-  const stairsCenter = roomCenter(stairsRoom);
-  const stairsSpot = findNearestPlainFloor(grid, stairsCenter, width, height);
+  // Place stairs in the main-chain room immediately before the boss room.
+  // Each candidate is checked against the pre-boss reachable area. If random
+  // retries cannot find a valid tile, fall back to a reachable start-room tile.
+  const reachableForStairs = reachableWithoutBossKey(grid, startCenter, width, height);
+  const stairsRoom =
+    mainCorridorChain[Math.max(0, mainCorridorChain.length - 2)] ?? startRoom;
+  const stairsSpot =
+    findReachablePlainFloorInRoom(grid, stairsRoom, reachableForStairs, 16) ??
+    findReachablePlainFloorInRoom(grid, startRoom, reachableForStairs, 16) ??
+    findNearestReachablePlainFloor(
+      grid,
+      startCenter,
+      reachableForStairs,
+      width,
+      height,
+    );
+
   if (stairsSpot) {
     grid[stairsSpot.y]![stairsSpot.x]!.type = 'stairsDown';
   }
@@ -405,6 +420,77 @@ function reachableWithoutBossKey(
     }
   }
   return visited;
+}
+
+/**
+ * Try random plain-floor tiles inside a room, accepting only tiles reachable
+ * from the start while the boss door is locked.
+ */
+function findReachablePlainFloorInRoom(
+  grid: Tile[][],
+  room: DungeonRoom,
+  reachable: Set<string>,
+  maxAttempts: number,
+): { x: number; y: number } | null {
+  const candidates: { x: number; y: number }[] = [];
+  for (let y = room.y; y < room.y + room.h; y++) {
+    for (let x = room.x; x < room.x + room.w; x++) {
+      if (grid[y]?.[x]?.type === 'floor') {
+        candidates.push({ x, y });
+      }
+    }
+  }
+
+  for (let attempt = 0; attempt < maxAttempts && candidates.length > 0; attempt++) {
+    const index = randInt(0, candidates.length - 1);
+    const candidate = candidates.splice(index, 1)[0]!;
+    if (reachable.has(`${candidate.x},${candidate.y}`)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+/** Final fallback: nearest reachable plain floor around the player start. */
+function findNearestReachablePlainFloor(
+  grid: Tile[][],
+  origin: { x: number; y: number },
+  reachable: Set<string>,
+  width: number,
+  height: number,
+): { x: number; y: number } | null {
+  const visited = new Set<string>([`${origin.x},${origin.y}`]);
+  const queue: { x: number; y: number }[] = [{ ...origin }];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const tile = grid[current.y]?.[current.x];
+    if (
+      tile?.type === 'floor' &&
+      reachable.has(`${current.x},${current.y}`)
+    ) {
+      return current;
+    }
+
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as const) {
+      const x = current.x + dx;
+      const y = current.y + dy;
+      const key = `${x},${y}`;
+      if (
+        x < 0 ||
+        y < 0 ||
+        x >= width ||
+        y >= height ||
+        visited.has(key) ||
+        !reachable.has(key)
+      ) {
+        continue;
+      }
+      visited.add(key);
+      queue.push({ x, y });
+    }
+  }
+  return null;
 }
 
 export function tileTypeIsWalkable(type: TileType): boolean {

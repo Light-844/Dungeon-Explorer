@@ -1,0 +1,52 @@
+Fix the skill system so each skill can only be learned and used by the classes it belongs to.
+
+CURRENT PROBLEM:
+Skills are not restricted by class, so a Mage can learn Warrior skills like Shield Bash. This must be fixed.
+
+SKILL DATA MODEL:
+Add a "classes" field to every skill definition:
+- Warrior skills: Whirlwind Strike, Shield Bash → classes: ["warrior"]
+- Mage skills: Fireball, Frost Nova → classes: ["mage"]
+- Rogue skills: Shadow Strike, Shadow Step → classes: ["rogue"]
+- Paladin skills: Holy Smite, Divine Light → classes: ["paladin"]
+- Boss skills (from dungeon bosses) → classes: ["all"]
+  (Boss skills are usable by every class, as they are permanent rewards.)
+
+Example:
+{
+  id: "whirlwind_strike",
+  name: "Whirlwind Strike",
+  classes: ["warrior"],
+  damageMultiplier: 1.4,
+  manaCost: 10,
+  range: "1 tile radius"
+}
+
+LEARN RULE (single function, used everywhere):
+canLearnSkill(skill, character):
+  - If skill.classes includes "all" → return true
+  - If skill.classes includes character.class → return true
+  - If character.class === "allrounder" → return true (see Allrounder rules)
+  - Otherwise → return false
+
+ENFORCEMENT POINTS (all must call canLearnSkill):
+- Level-up skill unlocks
+- Skill learning from any source (boss, item, NPC)
+- Loading a save file (remove any illegal skills automatically and log a warning)
+- Combat ability menu (only show skills the character can use)
+
+UI BEHAVIOR:
+- Skill tree shows locked class skills greyed out with label: "Requires [Class Name]"
+- Trying to use a skill the character cannot use shows: "Only [Class Name] can use this skill"
+
+DATA MIGRATION:
+- On load, if a saved character has a skill the class cannot use, remove that skill from learned skills
+- Do not delete boss skills (classes: "all")
+
+TESTING CHECKLIST:
+- ✓ Mage cannot learn Shield Bash, Shadow Strike, or Holy Smite
+- ✓ Warrior cannot learn Fireball or Frost Nova
+- ✓ Boss skills can be learned by all four base classes
+- ✓ Locked skills show greyed out in skill tree
+- ✓ Old saves with illegal skills are cleaned up without crashing
+- ✓ Ability menu in combat shows only usable skills

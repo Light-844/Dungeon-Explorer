@@ -16,6 +16,17 @@ description: How the 4-class system is structured, initialized, and integrated i
 - `guaranteedFlee: true` → `shadowStep` — exits battle immediately, checked first in skill branch.
 - `healPercent: 0.4` → `divineLight` — heals `maxHp * 0.4`, computed in battle skill self-target branch.
 
+## Skill Ownership
+
+- Every player skill declares allowed class IDs in `Skill.classes`.
+- Base-class skills are restricted to their listed class; boss-reward skills use `classes: ['all']`.
+- Enemy-only skills use `classes: ['enemy']` and are not listed as player skills.
+- Keep learning, save sanitation, menus, and combat execution behind the shared `canLearnSkill` rule.
+
+**Why:** The user requires class identity to affect which abilities can be learned and used, while boss-core rewards remain available to every base class.
+
+**How to apply:** When adding a skill or a new learning source, set its class list and use the shared rule at both the grant point and the combat execution boundary.
+
 ## Starter Gear IDs (per class)
 
 - warrior: `ironLongsword` + `paddedVest`

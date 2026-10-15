@@ -102,7 +102,7 @@ export function autoStatGainsForLevelUp(heroClass?: string): Partial<Stats> {
     rogue:   { maxHp: 5, maxMp: 2 },
     paladin: { maxHp: 6, maxMp: 3 },
   };
-  return (heroClass && table[heroClass]) ?? { maxHp: 5, maxMp: 2 };
+  return (heroClass ? table[heroClass] : undefined) ?? { maxHp: 5, maxMp: 2 };
 }
 
 /** Points granted to the player on every level-up, freely assignable to any stat. */

@@ -16,6 +16,14 @@ export interface Stats {
 export type Element = 'fire' | 'ice' | 'lightning' | 'earth' | 'holy' | 'poison' | 'none';
 
 export type SkillType = 'physical' | 'magic' | 'support';
+export type SkillClass =
+  | 'warrior'
+  | 'mage'
+  | 'rogue'
+  | 'paladin'
+  | 'allrounder'
+  | 'all'
+  | 'enemy';
 
 export interface ClassAttributes {
   str: number;
@@ -27,6 +35,8 @@ export interface ClassAttributes {
 export interface Skill {
   id: string;
   name: string;
+  /** Classes allowed to learn/use this skill; "all" is reserved for boss rewards. */
+  classes: SkillClass[];
   type: SkillType;
   mpCost: number;
   power: number;

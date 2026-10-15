@@ -28,6 +28,7 @@ export const SKILLS: Record<string, Skill> = {
   powerSlash: {
     id: 'powerSlash',
     name: 'Power Slash',
+    classes: ['warrior'],
     type: 'physical',
     mpCost: 3,
     power: 1.6,
@@ -39,6 +40,7 @@ export const SKILLS: Record<string, Skill> = {
   doubleStrike: {
     id: 'doubleStrike',
     name: 'Double Strike',
+    classes: ['warrior'],
     type: 'physical',
     mpCost: 5,
     power: 1.0,
@@ -50,6 +52,7 @@ export const SKILLS: Record<string, Skill> = {
   whirlwind: {
     id: 'whirlwind',
     name: 'Whirlwind Attack',
+    classes: ['warrior'],
     type: 'physical',
     mpCost: 8,
     power: 1.1,
@@ -61,6 +64,7 @@ export const SKILLS: Record<string, Skill> = {
   fireball: {
     id: 'fireball',
     name: 'Fireball',
+    classes: ['mage'],
     type: 'magic',
     mpCost: 6,
     power: 1.5,
@@ -72,6 +76,7 @@ export const SKILLS: Record<string, Skill> = {
   iceSpear: {
     id: 'iceSpear',
     name: 'Ice Spear',
+    classes: ['mage'],
     type: 'magic',
     mpCost: 6,
     power: 1.5,
@@ -83,6 +88,7 @@ export const SKILLS: Record<string, Skill> = {
   lightningBolt: {
     id: 'lightningBolt',
     name: 'Lightning Bolt',
+    classes: ['mage'],
     type: 'magic',
     mpCost: 7,
     power: 1.6,
@@ -94,6 +100,7 @@ export const SKILLS: Record<string, Skill> = {
   earthquake: {
     id: 'earthquake',
     name: 'Earthquake',
+    classes: ['mage'],
     type: 'magic',
     mpCost: 10,
     power: 1.3,
@@ -105,6 +112,7 @@ export const SKILLS: Record<string, Skill> = {
   healingLight: {
     id: 'healingLight',
     name: 'Healing Light',
+    classes: ['paladin'],
     type: 'magic',
     mpCost: 6,
     power: 0,
@@ -117,6 +125,7 @@ export const SKILLS: Record<string, Skill> = {
   increaseAttack: {
     id: 'increaseAttack',
     name: 'Increase Attack',
+    classes: ['warrior'],
     type: 'support',
     mpCost: 4,
     power: 0,
@@ -129,6 +138,7 @@ export const SKILLS: Record<string, Skill> = {
   shieldBarrier: {
     id: 'shieldBarrier',
     name: 'Shield Barrier',
+    classes: ['warrior', 'paladin'],
     type: 'support',
     mpCost: 5,
     power: 0,
@@ -141,6 +151,7 @@ export const SKILLS: Record<string, Skill> = {
   criticalStrike: {
     id: 'criticalStrike',
     name: 'Critical Strike',
+    classes: ['rogue'],
     type: 'physical',
     mpCost: 9,
     power: 2.2,
@@ -152,6 +163,7 @@ export const SKILLS: Record<string, Skill> = {
   meteorStorm: {
     id: 'meteorStorm',
     name: 'Meteor Storm',
+    classes: ['mage'],
     type: 'magic',
     mpCost: 14,
     power: 2.0,
@@ -163,6 +175,7 @@ export const SKILLS: Record<string, Skill> = {
   divineJudgment: {
     id: 'divineJudgment',
     name: 'Divine Judgment',
+    classes: ['paladin'],
     type: 'magic',
     mpCost: 16,
     power: 2.6,
@@ -178,6 +191,7 @@ export const SKILLS: Record<string, Skill> = {
   whirlwindStrike: {
     id: 'whirlwindStrike',
     name: 'Whirlwind Strike',
+    classes: ['warrior'],
     type: 'physical',
     mpCost: 10,
     power: 1.4,
@@ -189,6 +203,7 @@ export const SKILLS: Record<string, Skill> = {
   shieldBash: {
     id: 'shieldBash',
     name: 'Shield Bash',
+    classes: ['warrior'],
     type: 'physical',
     mpCost: 15,
     power: 1.2,
@@ -200,6 +215,7 @@ export const SKILLS: Record<string, Skill> = {
   frostNova: {
     id: 'frostNova',
     name: 'Frost Nova',
+    classes: ['mage'],
     type: 'magic',
     mpCost: 25,
     power: 1.5,
@@ -211,6 +227,7 @@ export const SKILLS: Record<string, Skill> = {
   shadowStrike: {
     id: 'shadowStrike',
     name: 'Shadow Strike',
+    classes: ['rogue'],
     type: 'physical',
     mpCost: 15,
     power: 2.5,
@@ -223,6 +240,7 @@ export const SKILLS: Record<string, Skill> = {
   shadowStep: {
     id: 'shadowStep',
     name: 'Shadow Step',
+    classes: ['rogue'],
     type: 'support',
     mpCost: 20,
     power: 0,
@@ -235,6 +253,7 @@ export const SKILLS: Record<string, Skill> = {
   holySmite: {
     id: 'holySmite',
     name: 'Holy Smite',
+    classes: ['paladin'],
     type: 'magic',
     mpCost: 15,
     power: 1.8,
@@ -246,6 +265,7 @@ export const SKILLS: Record<string, Skill> = {
   divineLight: {
     id: 'divineLight',
     name: 'Divine Light',
+    classes: ['paladin'],
     type: 'support',
     mpCost: 30,
     power: 0,
@@ -262,6 +282,7 @@ export const SKILLS: Record<string, Skill> = {
   shadowBolt: {
     id: 'shadowBolt',
     name: 'Shadow Bolt',
+    classes: ['all'],
     type: 'magic',
     mpCost: 8,
     power: 1.4,
@@ -273,6 +294,7 @@ export const SKILLS: Record<string, Skill> = {
   crystalShatter: {
     id: 'crystalShatter',
     name: 'Crystal Shatter',
+    classes: ['all'],
     type: 'magic',
     mpCost: 12,
     power: 2.0,
@@ -284,6 +306,7 @@ export const SKILLS: Record<string, Skill> = {
   infernoBreath: {
     id: 'infernoBreath',
     name: 'Inferno Breath',
+    classes: ['all'],
     type: 'magic',
     mpCost: 13,
     power: 1.7,
@@ -295,6 +318,7 @@ export const SKILLS: Record<string, Skill> = {
   blizzard: {
     id: 'blizzard',
     name: 'Blizzard',
+    classes: ['all'],
     type: 'magic',
     mpCost: 13,
     power: 1.7,
@@ -306,6 +330,7 @@ export const SKILLS: Record<string, Skill> = {
   toxicCloud: {
     id: 'toxicCloud',
     name: 'Toxic Cloud',
+    classes: ['all'],
     type: 'magic',
     mpCost: 11,
     power: 1.4,
@@ -321,6 +346,7 @@ export const SKILLS: Record<string, Skill> = {
   crystalBurst: {
     id: 'crystalBurst',
     name: 'Crystal Burst',
+    classes: ['enemy'],
     type: 'magic',
     mpCost: 6,
     power: 1.2,
@@ -332,6 +358,7 @@ export const SKILLS: Record<string, Skill> = {
   poisonStrike: {
     id: 'poisonStrike',
     name: 'Poison Strike',
+    classes: ['enemy'],
     type: 'physical',
     mpCost: 5,
     power: 1.2,

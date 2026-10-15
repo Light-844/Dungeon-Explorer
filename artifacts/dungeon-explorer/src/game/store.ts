@@ -10,6 +10,7 @@ import {
 } from './gameData';
 import { CLASSES } from './classData';
 import { generateDungeonLevel, tileTypeIsWalkable } from './dungeonGenerator';
+import { canLearnSkill, getSkillClassNames, sanitizePlayerSkills } from './skillRules';
 import {
   autoStatGainsForLevelUp,
   calcMagicDamage,
@@ -67,7 +68,17 @@ function freshPlayer(
     baseStats: { ...cls.baseStats },
     equipment,
     equipmentInventory: [],
-    skillIds: [...cls.startingSkillIds],
+    skillIds: [
+      ...new Set([
+        ...cls.startingSkillIds,
+        ...SKILL_UNLOCK_ORDER.filter(
+          (skill) => skill.unlockLevel === 1 && canLearnSkill(skill, { heroClass: cls.id }),
+        ).map((skill) => skill.id),
+      ]),
+    ].filter((id) => {
+      const skill = SKILLS[id];
+      return !!skill && canLearnSkill(skill, { heroClass: cls.id });
+    }),
     inventory: [{ item: ITEMS.smallPotion!, quantity: 3 }],
     statPoints: 0,
   };
@@ -177,7 +188,7 @@ function pushLog(
 
 export const useGameStore = create<GameState>((set, get) => ({
   mode: 'title',
-  player: freshPlayer(),
+  player: sanitizePlayerSkills(freshPlayer()),
   playerHp: 42,
   playerMp: 18,
   dungeon: null,
@@ -194,7 +205,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   swampMoveCooldownMs: 0,
 
   startNewGame: (name, gender, heroClass) => {
-    const player = freshPlayer(name, gender, heroClass);
+    const player = sanitizePlayerSkills(freshPlayer(name, gender, heroClass));
     const dungeon = generateDungeonLevel(1);
     const stats = effectivePlayerStats(player);
     const def = stats.def;
@@ -530,6 +541,20 @@ export const useGameStore = create<GameState>((set, get) => ({
       enemies: state.battle.enemies.map((e) => ({ ...e, stats: { ...e.stats } })),
     };
     const player = state.player;
+    if (action === 'skill' && payload?.skillId) {
+      const requestedSkill = SKILLS[payload.skillId];
+      const message =
+        !requestedSkill || !player.skillIds.includes(payload.skillId)
+          ? 'You have not learned that skill.'
+          : !canLearnSkill(requestedSkill, player)
+            ? `Only ${getSkillClassNames(requestedSkill.classes).join(' or ') || 'its assigned class'} can use ${requestedSkill.name}.`
+            : null;
+      if (message) {
+        pushLog(battle, message, 'system');
+        set({ battle });
+        return;
+      }
+    }
     const swampSlowed = isSwampSlowed(state);
     const playerStats = computeEffectiveStats(
       effectivePlayerStats(player, swampSlowed),
@@ -927,6 +952,15 @@ export const useGameStore = create<GameState>((set, get) => ({
     // ── Boss core consumption ──────────────────────────────────────────────
     if (item.type === 'bossCore') {
       const player = state.player;
+      const grantSkill = item.grantSkillId ? SKILLS[item.grantSkillId] : undefined;
+      if (grantSkill && !canLearnSkill(grantSkill, player)) {
+        const requiredClasses = getSkillClassNames(grantSkill.classes);
+        set({
+          message: `Only ${requiredClasses.join(' or ') || 'its assigned class'} can learn ${grantSkill.name}.`,
+          messageTone: 'warning',
+        });
+        return;
+      }
       let nextPlayer = consumeItem(player, item.id);
 
       if (item.grantSkillId && !player.skillIds.includes(item.grantSkillId)) {
@@ -1134,7 +1168,10 @@ function grantXp(player: PlayerCharacter, xp: number): PlayerCharacter {
     baseStats.hp = baseStats.maxHp;
     baseStats.mp = baseStats.maxMp;
     const newSkills = SKILL_UNLOCK_ORDER.filter(
-      (s) => s.unlockLevel === level && !skillIds.includes(s.id),
+      (s) =>
+        s.unlockLevel === level &&
+        !skillIds.includes(s.id) &&
+        canLearnSkill(s, player),
     );
     skillIds = [...skillIds, ...newSkills.map((s) => s.id)];
   }
@@ -1190,5 +1227,7 @@ export function getPlayerEffectiveStats(player: PlayerCharacter): import('./type
 }
 
 export function getAvailableSkills(player: PlayerCharacter): Skill[] {
-  return player.skillIds.map((id) => SKILLS[id]!).filter(Boolean);
+  return player.skillIds
+    .map((id) => SKILLS[id])
+    .filter((skill): skill is Skill => !!skill && canLearnSkill(skill, player));
 }

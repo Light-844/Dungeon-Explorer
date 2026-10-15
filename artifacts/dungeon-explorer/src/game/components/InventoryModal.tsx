@@ -1,5 +1,7 @@
 import { X } from 'lucide-react';
 import { equipmentDisplayName, getPlayerEffectiveStats, useGameStore } from '../store';
+import { SKILLS } from '../gameData';
+import { canLearnSkill, getSkillClassNames } from '../skillRules';
 import type { Equipment, EquipSlot, Stats } from '../types';
 
 const SLOTS: EquipSlot[] = ['weapon', 'armor', 'accessory'];
@@ -54,6 +56,46 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
             <X size={18} />
           </button>
         </div>
+
+        {/* Class skill list — unavailable skills stay visible with their requirement. */}
+        <section className="rounded-lg border border-card-border bg-background/40 p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 className="font-serif text-sm font-semibold text-foreground">Class Skills</h3>
+            <span className="text-[11px] capitalize text-muted-foreground">{player.heroClass}</span>
+          </div>
+          <div className="grid max-h-48 grid-cols-1 gap-1.5 overflow-y-auto sm:grid-cols-2">
+            {Object.values(SKILLS)
+              .filter((skill) => skill.classes.some((classId) => classId !== 'all' && classId !== 'enemy'))
+              .map((skill) => {
+                const allowed = canLearnSkill(skill, player);
+                const learned = player.skillIds.includes(skill.id);
+                const requirements = getSkillClassNames(skill.classes);
+                const status = !allowed
+                  ? `Requires ${requirements.join(' / ')}`
+                  : learned
+                    ? 'Learned'
+                    : skill.unlockLevel < 99
+                      ? `Unlocks at Lv. ${skill.unlockLevel}`
+                      : 'Not learned';
+                return (
+                  <div
+                    key={skill.id}
+                    className={`rounded-md border px-2.5 py-2 ${allowed ? 'border-card-border bg-card/60' : 'border-white/5 bg-black/25 opacity-45 grayscale'}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-xs font-semibold ${allowed ? 'text-foreground' : 'text-muted-foreground'}`}>
+                        {skill.name}
+                      </span>
+                      <span className={`shrink-0 text-[10px] font-medium ${allowed ? 'text-emerald-300' : 'text-muted-foreground'}`}>
+                        {status}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{skill.description}</p>
+                  </div>
+                );
+              })}
+          </div>
+        </section>
 
         {/* Stats grid */}
         <div className="grid grid-cols-3 gap-2 rounded-lg border border-card-border bg-background/40 p-3 text-xs sm:grid-cols-4">
