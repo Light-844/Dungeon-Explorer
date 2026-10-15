@@ -93,8 +93,14 @@ function loadSavedParty(): Pick<GameState, 'companion' | 'companionEventComplete
     const raw = localStorage.getItem(PARTY_STORAGE_KEY);
     if (!raw) return { companion: null, companionEventCompleted: false };
     const saved = JSON.parse(raw) as Partial<SavedPartyData>;
-    const companion = isCompanionCharacter(saved.party?.companion)
-      ? sanitizePlayerSkills(saved.party.companion)
+    const savedCompanion = saved.party?.companion;
+    const companion = isCompanionCharacter(savedCompanion)
+      ? {
+          ...sanitizePlayerSkills(savedCompanion),
+          currentHp: savedCompanion.currentHp,
+          currentMp: savedCompanion.currentMp,
+          isKnockedOut: savedCompanion.isKnockedOut,
+        }
       : null;
     return {
       companion,
@@ -855,7 +861,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     const nextFloor = dungeon.floor + 1;
-    if (nextFloor > 5) {
+    if (nextFloor > 10) {
       const title = player.title ?? "Conqueror of Pantheon's Dungeon";
       const nextCompanion = companion
         ? { ...companion, title: companion.title ?? title, expPenaltyActive: false }

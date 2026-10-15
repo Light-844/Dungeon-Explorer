@@ -33,7 +33,7 @@ export function VictoryScreen() {
       <Crown size={48} className="text-primary" />
       <h1 className="font-serif text-4xl font-bold text-primary">Depths Conquered!</h1>
       <p className="text-sm text-muted-foreground">
-        {player.name} cleared all five floors at level {player.level} with {player.gold} gold.
+        {player.name} cleared all ten floors at level {player.level} with {player.gold} gold.
       </p>
       {player.title && (
         <p className="font-serif text-sm font-semibold text-primary">

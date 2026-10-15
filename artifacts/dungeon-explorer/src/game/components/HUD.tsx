@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Backpack, Coins, Flame, Heart, Snowflake, Sparkles, Star, Swords, Wind } from 'lucide-react';
 import { getPlayerEffectiveStats, useGameStore } from '../store';
 import { CLASSES } from '../classData';
+import { SKILLS } from '../gameData';
 import type { CompanionCharacter } from '../types';
 
 function StatBar({
@@ -138,7 +139,7 @@ function CompanionPartyCard({ companion }: { companion: CompanionCharacter }) {
           <div className="border-t border-white/10 pt-1.5 text-[10px] leading-relaxed text-muted-foreground">
             Attributes: STR {companion.classAttributes.str} · DEX {companion.classAttributes.dex} · INT {companion.classAttributes.int} · CON {companion.classAttributes.con}
             <br />
-            Skills: {companion.skillIds.map((id) => id.replace(/([A-Z])/g, ' $1')).join(', ') || 'Basic attack'}
+            Skills: {companion.skillIds.map((id) => SKILLS[id]?.name ?? id).join(', ') || 'Basic attack'}
             {companion.isKnockedOut && (
               <span className="mt-1 block font-semibold text-destructive">
                 Revives with 30% HP on the next floor.
