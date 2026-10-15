@@ -1,0 +1,63 @@
+Add the Allrounder class, a versatile hero who can learn all skills but progresses slowly.
+
+CLASS PROFILE:
+- Name: Allrounder
+- Role: Master of all trades. Slow to learn, but unstoppable once trained.
+- Base Vitals: 100 HP | 60 Mana
+- Attributes: STR 11 | DEX 11 | INT 11 | CON 11
+- Starter Weapon: Sword
+- Starter Skills: Whirlwind Strike, Fireball
+- Color Theme: Silver / White
+
+UNALLOCATED STAT POINTS (CHARACTER CREATION):
+- Allrounder receives 5 unallocated stat points at creation
+- Player distributes them across STR, DEX, INT, CON using +/- buttons
+- Show live preview of what each point does:
+  - STR: +1.2 Attack per point
+  - DEX: +0.8% Crit Chance per point
+  - INT: +8 Max Mana per point
+  - CON: +8 Max HP and +0.8 Defense per point
+- Points must all be spent before "Begin Adventure" is enabled
+- Allocation is locked after the first dungeon run starts
+
+SKILL RULES:
+- Can learn ALL skills from all classes (uses canLearnSkill from the class fix)
+- Learning speed is slower: every skill unlock level is multiplied by 1.5 and rounded up
+  - Example: Warrior learns Shield Bash at Level 3 → Allrounder learns it at Level 5 (3 × 1.5 = 4.5, rounded up)
+  - Example: Mage learns Frost Nova at Level 3 → Allrounder learns it at Level 5
+- Show the adjusted unlock level in the skill tree: "Unlocks at Level 5 (Allrounder pace)"
+
+WEAPON RULES:
+- Can equip all weapon types: Swords, Wands, Daggers, Hammers
+- Other classes keep their normal weapon restrictions
+
+EXP PENALTY:
+- -2% EXP gain until the player earns their first title ("Conqueror of Pantheon's Dungeon")
+- Show a small badge on the character sheet: "EXP -2% (until first title)"
+- When the first title is earned, remove the penalty and show: "Your versatility finally pays off! EXP penalty removed."
+
+CLASS SELECTION SCREEN:
+- Show Allrounder as the 5th card with silver/white theme
+- Description on card: "Master of all trades. Slow to learn, but unstoppable once trained."
+- Show its starter stats, starter weapon, and the 5 points notice
+
+DATA TO SAVE:
+{
+  class: "allrounder",
+  unallocatedPoints: 0,
+  allocatedStats: { STR, DEX, INT, CON },
+  expPenaltyActive: true // set to false after first title
+}
+
+TESTING CHECKLIST:
+- ✓ Allrounder appears as 5th class card
+- ✓ Base stats are 100 HP, 60 Mana, 11/11/11/11
+- ✓ Starts with Whirlwind Strike and Fireball
+- ✓ 5 stat points can be allocated and must all be spent
+- ✓ Allocated points apply to the stats shown
+- ✓ Can learn skills from all classes
+- ✓ Skill unlock levels are 1.5x slower and rounded up
+- ✓ Can equip all four weapon types
+- ✓ EXP is reduced by 2% until first title
+- ✓ Penalty is removed after first title
+- ✓ Other classes are not affected

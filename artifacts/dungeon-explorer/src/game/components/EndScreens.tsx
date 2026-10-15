@@ -35,6 +35,16 @@ export function VictoryScreen() {
       <p className="text-sm text-muted-foreground">
         {player.name} cleared all five floors at level {player.level} with {player.gold} gold.
       </p>
+      {player.title && (
+        <p className="font-serif text-sm font-semibold text-primary">
+          Title earned: {player.title}
+        </p>
+      )}
+      {player.heroClass === 'allrounder' && !player.expPenaltyActive && (
+        <p className="max-w-md text-sm text-slate-200">
+          Your versatility finally pays off! EXP penalty removed.
+        </p>
+      )}
       <button
         type="button"
         onClick={returnToTitle}

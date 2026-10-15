@@ -1,7 +1,8 @@
 import { X } from 'lucide-react';
 import { equipmentDisplayName, getPlayerEffectiveStats, useGameStore } from '../store';
 import { SKILLS } from '../gameData';
-import { canLearnSkill, getSkillClassNames } from '../skillRules';
+import { canLearnSkill, getSkillClassNames, getSkillUnlockLevel } from '../skillRules';
+import { canClassEquipWeapon, CLASSES } from '../classData';
 import type { Equipment, EquipSlot, Stats } from '../types';
 
 const SLOTS: EquipSlot[] = ['weapon', 'armor', 'accessory'];
@@ -57,6 +58,37 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
+        <section className="rounded-lg border border-card-border bg-background/40 p-3">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h3 className="font-serif text-sm font-semibold text-foreground">
+                {player.name} · {CLASSES[player.heroClass]?.name ?? player.heroClass}
+              </h3>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {player.title ? `Title: ${player.title}` : 'No title earned yet'}
+              </p>
+            </div>
+            {player.expPenaltyActive && (
+              <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-1 text-[10px] font-semibold text-amber-300">
+                EXP -2% (until first title)
+              </span>
+            )}
+          </div>
+          {player.heroClass === 'allrounder' && (
+            <div className="mt-2 border-t border-white/10 pt-2 text-[11px] text-muted-foreground">
+              <div>
+                Attributes: STR {player.classAttributes.str} · DEX {player.classAttributes.dex} · INT {player.classAttributes.int} · CON {player.classAttributes.con}
+              </div>
+              <div className="mt-1">
+                Creation points: STR +{player.allocatedStats.str}, DEX +{player.allocatedStats.dex}, INT +{player.allocatedStats.int}, CON +{player.allocatedStats.con}
+                {player.unallocatedPoints > 0
+                  ? ` · ${player.unallocatedPoints} unspent`
+                  : ' · Locked for this run'}
+              </div>
+            </div>
+          )}
+        </section>
+
         {/* Class skill list — unavailable skills stay visible with their requirement. */}
         <section className="rounded-lg border border-card-border bg-background/40 p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
@@ -70,12 +102,15 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
                 const allowed = canLearnSkill(skill, player);
                 const learned = player.skillIds.includes(skill.id);
                 const requirements = getSkillClassNames(skill.classes);
+                const unlockLevel = getSkillUnlockLevel(skill, player.heroClass);
                 const status = !allowed
                   ? `Requires ${requirements.join(' / ')}`
                   : learned
                     ? 'Learned'
-                    : skill.unlockLevel < 99
-                      ? `Unlocks at Lv. ${skill.unlockLevel}`
+                    : unlockLevel < 99
+                      ? player.heroClass === 'allrounder'
+                        ? `Unlocks at Lv. ${unlockLevel} (Allrounder pace)`
+                        : `Unlocks at Lv. ${unlockLevel}`
                       : 'Not learned';
                 return (
                   <div
@@ -172,6 +207,9 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
                   key={eq.instanceUid}
                   className="flex items-center justify-between rounded-md border border-card-border bg-background/40 px-3 py-2 text-xs"
                 >
+                  {eq.slot === 'weapon' && !canClassEquipWeapon(player.heroClass, eq.weaponType) && (
+                    <div className="sr-only">This weapon cannot be equipped by your class.</div>
+                  )}
                   <div>
                     <div className="font-medium capitalize text-foreground">
                       {equipmentDisplayName(eq)}{' '}
@@ -181,13 +219,20 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
                       {Object.entries(eq.statBonus).map(([k, v]) => `${STAT_LABELS[k] ?? k} +${v}`).join(', ')}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => equipItem(eq.instanceUid!)}
-                    className="ml-2 shrink-0 rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover-elevate active-elevate-2"
-                  >
-                    Equip
-                  </button>
+                  {(() => {
+                    const classLocked = eq.slot === 'weapon' && !canClassEquipWeapon(player.heroClass, eq.weaponType);
+                    return (
+                      <button
+                        type="button"
+                        disabled={classLocked}
+                        onClick={() => equipItem(eq.instanceUid!)}
+                        title={classLocked ? `Your ${CLASSES[player.heroClass]?.name ?? player.heroClass} cannot equip this weapon.` : undefined}
+                        className="ml-2 shrink-0 rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover-elevate active-elevate-2 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {classLocked ? 'Class locked' : 'Equip'}
+                      </button>
+                    );
+                  })()}
                 </div>
               ))}
             </div>

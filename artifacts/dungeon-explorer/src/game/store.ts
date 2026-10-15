@@ -8,9 +8,14 @@ import {
   SKILL_UNLOCK_ORDER,
   SKILLS,
 } from './gameData';
-import { CLASSES } from './classData';
+import { canClassEquipWeapon, CLASSES } from './classData';
 import { generateDungeonLevel, tileTypeIsWalkable } from './dungeonGenerator';
-import { canLearnSkill, getSkillClassNames, sanitizePlayerSkills } from './skillRules';
+import {
+  canLearnSkill,
+  getSkillClassNames,
+  getSkillUnlockLevel,
+  sanitizePlayerSkills,
+} from './skillRules';
 import {
   autoStatGainsForLevelUp,
   calcMagicDamage,
@@ -23,6 +28,7 @@ import {
 } from './combatEngine';
 import type {
   BattleLogEntry,
+  ClassAttributes,
   DungeonLevel,
   EnemyInstance,
   EquipSlot,
@@ -48,8 +54,29 @@ function freshPlayer(
   name = 'Adventurer',
   gender: 'male' | 'female' = 'male',
   heroClass = 'warrior',
+  creationAllocation?: ClassAttributes,
 ): PlayerCharacter {
   const cls = CLASSES[heroClass] ?? CLASSES.warrior!;
+  const allocatedStats =
+    cls.id === 'allrounder' ? { ...(creationAllocation ?? { str: 0, dex: 0, int: 0, con: 0 }) } :
+      { str: 0, dex: 0, int: 0, con: 0 };
+  const pointsSpent = Object.values(allocatedStats).reduce((sum, value) => sum + value, 0);
+  const classAttributes: ClassAttributes = {
+    str: cls.attributes.str + allocatedStats.str,
+    dex: cls.attributes.dex + allocatedStats.dex,
+    int: cls.attributes.int + allocatedStats.int,
+    con: cls.attributes.con + allocatedStats.con,
+  };
+  const baseStats = { ...cls.baseStats };
+  if (cls.id === 'allrounder') {
+    baseStats.atk += allocatedStats.str * 1.2;
+    baseStats.luck += allocatedStats.dex * 0.8;
+    baseStats.maxMp += allocatedStats.int * 8;
+    baseStats.mp += allocatedStats.int * 8;
+    baseStats.maxHp += allocatedStats.con * 8;
+    baseStats.hp += allocatedStats.con * 8;
+    baseStats.def += allocatedStats.con * 0.8;
+  }
   const weapon = EQUIPMENT[cls.starterWeaponId];
   const armor  = EQUIPMENT[cls.starterArmorId];
   const equipment: PlayerCharacter['equipment'] = {};
@@ -60,19 +87,23 @@ function freshPlayer(
     name,
     gender,
     heroClass: cls.id,
-    classAttributes: { ...cls.attributes },
+    classAttributes,
+    allocatedStats,
+    unallocatedPoints: cls.id === 'allrounder' ? Math.max(0, 5 - pointsSpent) : 0,
+    expPenaltyActive: cls.id === 'allrounder',
+    title: null,
     level: 1,
     xp: 0,
     xpToNext: xpToNextLevel(1),
     gold: 30,
-    baseStats: { ...cls.baseStats },
+    baseStats,
     equipment,
     equipmentInventory: [],
     skillIds: [
       ...new Set([
         ...cls.startingSkillIds,
         ...SKILL_UNLOCK_ORDER.filter(
-          (skill) => skill.unlockLevel === 1 && canLearnSkill(skill, { heroClass: cls.id }),
+          (skill) => getSkillUnlockLevel(skill, cls.id) === 1 && canLearnSkill(skill, { heroClass: cls.id }),
         ).map((skill) => skill.id),
       ]),
     ].filter((id) => {
@@ -131,7 +162,12 @@ interface GameState {
   /** Move cooldown deadline (ms) for swamp slow. 0 = free to move. */
   swampMoveCooldownMs: number;
 
-  startNewGame: (name: string, gender: 'male' | 'female', heroClass: string) => void;
+  startNewGame: (
+    name: string,
+    gender: 'male' | 'female',
+    heroClass: string,
+    allocatedStats?: ClassAttributes,
+  ) => void;
   movePlayer: (dx: number, dy: number) => void;
   openChest: () => void;
   interactShop: () => void;
@@ -204,8 +240,27 @@ export const useGameStore = create<GameState>((set, get) => ({
   terrainDamageInterval: 0,
   swampMoveCooldownMs: 0,
 
-  startNewGame: (name, gender, heroClass) => {
-    const player = sanitizePlayerSkills(freshPlayer(name, gender, heroClass));
+  startNewGame: (name, gender, heroClass, allocatedStats) => {
+    if (
+      heroClass === 'allrounder' &&
+      (!allocatedStats ||
+        Object.values(allocatedStats).some((value) => !Number.isInteger(value) || value < 0) ||
+        Object.values(allocatedStats).reduce((sum, value) => sum + value, 0) !== 5)
+    ) {
+      set({
+        message: 'Allocate exactly 5 Allrounder creation points before starting.',
+        messageTone: 'warning',
+      });
+      return;
+    }
+    const player = sanitizePlayerSkills(freshPlayer(name, gender, heroClass, allocatedStats));
+    if (player.unallocatedPoints > 0) {
+      set({
+        message: `Spend all ${player.unallocatedPoints} remaining Allrounder stat point${player.unallocatedPoints === 1 ? '' : 's'} before starting.`,
+        messageTone: 'warning',
+      });
+      return;
+    }
     const dungeon = generateDungeonLevel(1);
     const stats = effectivePlayerStats(player);
     const def = stats.def;
@@ -408,6 +463,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     const player = get().player;
     const gear = player.equipmentInventory.find((e) => e.instanceUid === instanceUid);
     if (!gear) return;
+    if (gear.slot === 'weapon' && !canClassEquipWeapon(player.heroClass, gear.weaponType)) {
+      set({
+        message: `${gear.name} cannot be equipped by your ${CLASSES[player.heroClass]?.name ?? player.heroClass}.`,
+        messageTone: 'warning',
+      });
+      return;
+    }
     const currentlyEquipped = player.equipment[gear.slot];
     const nextEquipmentInventory = player.equipmentInventory.filter(
       (e) => e.instanceUid !== instanceUid,
@@ -509,7 +571,14 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const nextFloor = dungeon.floor + 1;
     if (nextFloor > 5) {
-      set({ player: consumeItem(player, 'dungeonKey'), mode: 'victory' });
+      set({
+        player: {
+          ...consumeItem(player, 'dungeonKey'),
+          title: player.title ?? "Conqueror of Pantheon's Dungeon",
+          expPenaltyActive: false,
+        },
+        mode: 'victory',
+      });
       return;
     }
     const nextDungeon = generateDungeonLevel(nextFloor);
@@ -734,7 +803,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       const totalXp = battle.enemies.reduce((sum, e) => sum + e.xpReward, 0);
       const totalGold = battle.enemies.reduce((sum, e) => sum + e.goldReward, 0);
       const preLevel = get().player.level;
-      let leveledPlayer = grantXp(get().player, totalXp);
+      const playerBeforeXp = get().player;
+      const xpPenaltyActive = playerBeforeXp.heroClass === 'allrounder' && playerBeforeXp.expPenaltyActive;
+      const awardedXp = xpPenaltyActive ? Math.floor(totalXp * 0.98) : totalXp;
+      let leveledPlayer = grantXp(playerBeforeXp, awardedXp);
       leveledPlayer = { ...leveledPlayer, gold: leveledPlayer.gold + totalGold };
       const leveledUp = leveledPlayer.level > preLevel;
 
@@ -792,7 +864,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         playerMp: finalMp,
         player: leveledPlayer,
         dungeon: dungeon ? { ...dungeon } : dungeon,
-        message: `Victory! +${totalXp} XP, +${totalGold} gold.${dropText}${levelUpText}`,
+        message: `Victory! +${awardedXp} XP${xpPenaltyActive ? ' (2% Allrounder penalty)' : ''}, +${totalGold} gold.${dropText}${levelUpText}`,
         messageTone: 'success',
       });
       return;
@@ -1169,7 +1241,7 @@ function grantXp(player: PlayerCharacter, xp: number): PlayerCharacter {
     baseStats.mp = baseStats.maxMp;
     const newSkills = SKILL_UNLOCK_ORDER.filter(
       (s) =>
-        s.unlockLevel === level &&
+        getSkillUnlockLevel(s, player.heroClass) === level &&
         !skillIds.includes(s.id) &&
         canLearnSkill(s, player),
     );

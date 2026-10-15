@@ -132,6 +132,11 @@ export function HUD({ onOpenInventory }: { onOpenInventory: () => void }) {
               {player.statPoints} stat point{player.statPoints > 1 ? 's' : ''} available!
             </div>
           )}
+          {player.expPenaltyActive && (
+            <div className="text-[10px] font-semibold text-amber-300">
+              EXP -2% (until first title)
+            </div>
+          )}
           {dungeon && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <Swords size={12} /> Floor {dungeon.floor} — {dungeon.theme.name}

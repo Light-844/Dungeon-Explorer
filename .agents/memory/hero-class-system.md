@@ -27,11 +27,23 @@ description: How the 4-class system is structured, initialized, and integrated i
 
 **How to apply:** When adding a skill or a new learning source, set its class list and use the shared rule at both the grant point and the combat execution boundary.
 
+## Allrounder Rules
+
+- Allrounder can learn skills assigned to any player class, but level-gated skills unlock at `ceil(baseUnlockLevel × 1.5)`.
+- Its five creation points must be allocated to STR, DEX, INT, and CON before a run starts; those choices are recorded and cannot be changed during that run.
+- Allrounder can equip every catalogued weapon family. Other classes use their explicit class weapon-family lists.
+- Allrounder earns 2% less XP until earning the final-dungeon title, then the penalty is permanently cleared for that run.
+
+**Why:** The user defined Allrounder as a flexible class whose broad access is balanced by slower learning, mandatory stat allocation, and a temporary XP penalty.
+
+**How to apply:** Keep the same Allrounder rules in class creation, skill unlock calculations, equip validation, XP awards, and title/reward handling.
+
 ## Starter Gear IDs (per class)
 
 - warrior: `ironLongsword` + `paddedVest`
 - mage: `apprenticeWand` + `silkRobes`
 - rogue: `twinDaggers` + `shadowLeathers`
 - paladin: `warHammer` + `paddedVest`
+- allrounder: `ironLongsword` + `paddedVest`
 
 **Why:** Class selection happens on the TitleScreen (3-step: identity → class → begin). All 4 class starter weapons/armors live in `EQUIPMENT` in gameData.ts.

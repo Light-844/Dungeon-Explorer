@@ -1,4 +1,4 @@
-import type { ClassAttributes, Stats } from './types';
+import type { ClassAttributes, Stats, WeaponType } from './types';
 
 export interface ClassDef {
   id: string;
@@ -11,6 +11,8 @@ export interface ClassDef {
   /** Equipment IDs for starter weapon and armor. */
   starterWeaponId: string;
   starterArmorId: string;
+  /** Weapon families this class can equip. */
+  weaponTypes: WeaponType[];
   /** Skill IDs the class begins with (not gated by level). */
   startingSkillIds: string[];
   /** Automatic stat gains every level-up (on top of free stat points). */
@@ -39,6 +41,7 @@ export const CLASSES: Record<string, ClassDef> = {
     attributes: { str: 14, dex: 10, int: 8, con: 14 },
     starterWeaponId: 'ironLongsword',
     starterArmorId: 'paddedVest',
+    weaponTypes: ['sword', 'hammer', 'spear', 'axe'],
     startingSkillIds: ['whirlwindStrike', 'shieldBash'],
     levelUpGains: { maxHp: 7, maxMp: 1 },
     colorPrimary: '#6ba3c8',
@@ -73,6 +76,7 @@ export const CLASSES: Record<string, ClassDef> = {
     attributes: { str: 8, dex: 10, int: 16, con: 10 },
     starterWeaponId: 'apprenticeWand',
     starterArmorId: 'silkRobes',
+    weaponTypes: ['wand'],
     startingSkillIds: ['fireball', 'frostNova'],
     levelUpGains: { maxHp: 3, maxMp: 5 },
     colorPrimary: '#9b6bdf',
@@ -107,6 +111,7 @@ export const CLASSES: Record<string, ClassDef> = {
     attributes: { str: 10, dex: 16, int: 10, con: 11 },
     starterWeaponId: 'twinDaggers',
     starterArmorId: 'shadowLeathers',
+    weaponTypes: ['dagger', 'bow', 'sword'],
     startingSkillIds: ['shadowStrike', 'shadowStep'],
     levelUpGains: { maxHp: 5, maxMp: 2 },
     colorPrimary: '#8b5cf6',
@@ -141,6 +146,7 @@ export const CLASSES: Record<string, ClassDef> = {
     attributes: { str: 12, dex: 9, int: 12, con: 13 },
     starterWeaponId: 'warHammer',
     starterArmorId: 'paddedVest',
+    weaponTypes: ['hammer', 'sword', 'spear'],
     startingSkillIds: ['holySmite', 'divineLight'],
     levelUpGains: { maxHp: 6, maxMp: 3 },
     colorPrimary: '#f0c040',
@@ -158,6 +164,45 @@ export const CLASSES: Record<string, ClassDef> = {
       },
     ],
   },
+
+  allrounder: {
+    id: 'allrounder',
+    name: 'Allrounder',
+    role: 'Master of All Trades',
+    description: 'Master of all trades. Slow to learn, but unstoppable once trained.',
+    baseStats: {
+      hp: 100, maxHp: 100,
+      mp: 60, maxMp: 60,
+      atk: 11, def: 8,
+      matk: 11, mdef: 8,
+      spd: 11, luck: 11,
+    },
+    attributes: { str: 11, dex: 11, int: 11, con: 11 },
+    starterWeaponId: 'ironLongsword',
+    starterArmorId: 'paddedVest',
+    weaponTypes: ['sword', 'wand', 'dagger', 'hammer', 'spear', 'axe', 'bow'],
+    startingSkillIds: ['whirlwindStrike', 'fireball'],
+    levelUpGains: { maxHp: 5, maxMp: 3 },
+    colorPrimary: '#e2e8f0',
+    colorGlow: '#e2e8f055',
+    abilities: [
+      {
+        name: 'Whirlwind Strike',
+        cost: '10 MP',
+        desc: 'Slice through all enemies at once — 140 % physical damage to each.',
+      },
+      {
+        name: 'Fireball',
+        cost: '6 MP',
+        desc: 'Hurl a searing fireball — 150 % spell damage, great vs ice enemies.',
+      },
+    ],
+  },
 };
 
 export const CLASS_LIST = Object.values(CLASSES);
+
+export function canClassEquipWeapon(heroClass: string, weaponType?: WeaponType): boolean {
+  if (!weaponType) return false;
+  return CLASSES[heroClass]?.weaponTypes.includes(weaponType) ?? false;
+}

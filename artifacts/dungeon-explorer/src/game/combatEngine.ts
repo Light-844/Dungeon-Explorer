@@ -101,6 +101,7 @@ export function autoStatGainsForLevelUp(heroClass?: string): Partial<Stats> {
     mage:    { maxHp: 3, maxMp: 5 },
     rogue:   { maxHp: 5, maxMp: 2 },
     paladin: { maxHp: 6, maxMp: 3 },
+    allrounder: { maxHp: 5, maxMp: 3 },
   };
   return (heroClass ? table[heroClass] : undefined) ?? { maxHp: 5, maxMp: 2 };
 }

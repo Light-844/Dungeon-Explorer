@@ -32,6 +32,8 @@ export interface ClassAttributes {
   con: number;
 }
 
+export type WeaponType = 'sword' | 'wand' | 'dagger' | 'hammer' | 'spear' | 'axe' | 'bow';
+
 export interface Skill {
   id: string;
   name: string;
@@ -88,6 +90,7 @@ export interface Equipment {
   id: string;
   name: string;
   slot: EquipSlot;
+  weaponType?: WeaponType;
   statBonus: Partial<Record<keyof Stats, number>>;
   description: string;
   value: number;
@@ -208,6 +211,13 @@ export interface PlayerCharacter {
   gender: 'male' | 'female';
   heroClass: string;
   classAttributes: ClassAttributes;
+  /** Character-creation points assigned to STR / DEX / INT / CON. */
+  allocatedStats: ClassAttributes;
+  /** Remaining Allrounder character-creation points. Must be 0 before a run starts. */
+  unallocatedPoints: number;
+  /** Allrounders earn 2% less XP until they claim their first title. */
+  expPenaltyActive: boolean;
+  title: string | null;
   level: number;
   xp: number;
   xpToNext: number;

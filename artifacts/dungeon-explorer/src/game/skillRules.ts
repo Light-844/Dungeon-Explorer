@@ -14,6 +14,16 @@ export function canLearnSkill(
   );
 }
 
+/** Apply the Allrounder's slower progression to every level-gated skill. */
+export function getSkillUnlockLevel(
+  skill: Pick<Skill, 'unlockLevel'>,
+  heroClass: string,
+): number {
+  return heroClass === 'allrounder'
+    ? Math.ceil(skill.unlockLevel * 1.5)
+    : skill.unlockLevel;
+}
+
 /** Return readable class names for skill lock messages and UI badges. */
 export function getSkillClassNames(classes: SkillClass[]): string[] {
   return classes

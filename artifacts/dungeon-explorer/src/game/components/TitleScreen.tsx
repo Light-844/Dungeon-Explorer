@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { Swords, Wand2, Zap, Shield, User, ChevronRight, Flame } from 'lucide-react';
+import { Swords, Wand2, Zap, Shield, User, ChevronRight, Flame, Sparkles, Minus, Plus } from 'lucide-react';
 import { useGameStore } from '../store';
 import { CLASS_LIST, type ClassDef } from '../classData';
+import { EQUIPMENT } from '../gameData';
+import type { ClassAttributes } from '../types';
 import titleBg from '../../assets/title-bg.png';
 
 /* ── Constants ─────────────────────────────────────────────────────────────── */
@@ -11,7 +13,16 @@ const CLASS_ICONS: Record<string, React.ReactNode> = {
   mage:    <Wand2  size={24} />,
   rogue:   <Zap    size={24} />,
   paladin: <Shield size={24} />,
+  allrounder: <Sparkles size={24} />,
 };
+
+const EMPTY_ALLOCATION: ClassAttributes = { str: 0, dex: 0, int: 0, con: 0 };
+const ALLOCATION_STATS: { key: keyof ClassAttributes; label: string; effect: string }[] = [
+  { key: 'str', label: 'STR', effect: '+1.2 Attack' },
+  { key: 'dex', label: 'DEX', effect: '+0.8% Crit' },
+  { key: 'int', label: 'INT', effect: '+8 Max Mana' },
+  { key: 'con', label: 'CON', effect: '+8 Max HP, +0.8 DEF' },
+];
 
 const DEFAULT_NAMES: Record<string, string> = {
   male:   'Rohit',
@@ -56,7 +67,7 @@ function ClassButton({ cls, selected, onSelect }: { cls: ClassDef; selected: boo
     <button
       type="button"
       onClick={onSelect}
-      className="flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-center transition-all w-full"
+      className="flex min-h-[150px] flex-col items-center justify-center gap-1.5 rounded-xl border-2 p-2 text-center transition-all w-full"
       style={
         selected
           ? {
@@ -77,21 +88,30 @@ function ClassButton({ cls, selected, onSelect }: { cls: ClassDef; selected: boo
 
       {/* Class name — large and bold */}
       <span
-        className="font-serif text-base font-bold leading-tight"
+        className="font-serif text-sm font-bold leading-tight sm:text-base"
         style={{ color: selected ? cls.colorPrimary : '#ffffff' }}
       >
         {cls.name}
       </span>
 
       {/* HP / MP */}
-      <div className="flex gap-3 text-xs font-mono font-semibold">
+      <div className="flex gap-2 text-[10px] font-mono font-semibold sm:gap-3 sm:text-xs">
         <span className="text-red-300">HP {cls.baseStats.maxHp}</span>
         <span className="text-blue-300">MP {cls.baseStats.maxMp}</span>
       </div>
 
+      <span className="text-[10px] leading-tight text-white/65">
+        {EQUIPMENT[cls.starterWeaponId]?.name ?? 'Starter weapon'}
+      </span>
+      {cls.id === 'allrounder' && (
+        <span className="rounded-full bg-white/15 px-2 py-0.5 text-[9px] font-bold text-slate-100">
+          5 stat points
+        </span>
+      )}
+
       {/* Role pill */}
       <span
-        className="rounded-full px-2.5 py-1 text-[11px] font-semibold leading-tight"
+        className="rounded-full px-2 py-1 text-[9px] font-semibold leading-tight sm:text-[10px]"
         style={
           selected
             ? { backgroundColor: `${cls.colorPrimary}40`, color: cls.colorPrimary }
@@ -118,6 +138,19 @@ function SkillsPanel({ cls }: { cls: ClassDef }) {
       <p className="text-sm text-white/75 mb-4 leading-relaxed">
         {cls.description}
       </p>
+      {cls.id === 'allrounder' && (
+        <div className="mb-4 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs text-slate-100">
+          <div className="font-semibold">
+            Base attributes: STR 11 · DEX 11 · INT 11 · CON 11
+          </div>
+          <div className="mt-1 text-white/65">
+            ATK 11 · DEF 8 · MATK 11 · MDEF 8 · SPD 11 · LUK 11
+          </div>
+          <div className="mt-1 text-white/65">
+            Starter weapon: {EQUIPMENT[cls.starterWeaponId]?.name ?? 'Sword'}
+          </div>
+        </div>
+      )}
 
       {/* Abilities heading */}
       <div
@@ -155,21 +188,102 @@ function SkillsPanel({ cls }: { cls: ClassDef }) {
 }
 
 /* ── Screen 2: Class selection ─────────────────────────────────────────────── */
+function AllrounderPointAllocation({
+  allocatedStats,
+  onChange,
+}: {
+  allocatedStats: ClassAttributes;
+  onChange: (next: ClassAttributes) => void;
+}) {
+  const spent = Object.values(allocatedStats).reduce((sum, value) => sum + value, 0);
+  const remaining = Math.max(0, 5 - spent);
+  const hp = 100 + allocatedStats.con * 8;
+  const mp = 60 + allocatedStats.int * 8;
+  const attack = 11 + allocatedStats.str * 1.2;
+  const defense = 8 + allocatedStats.con * 0.8;
+  const crit = 5 + Math.min(25, (11 + allocatedStats.dex * 0.8));
+
+  function adjust(stat: keyof ClassAttributes, delta: number) {
+    const nextValue = allocatedStats[stat] + delta;
+    if (nextValue < 0 || (delta > 0 && remaining === 0)) return;
+    onChange({ ...allocatedStats, [stat]: nextValue });
+  }
+
+  return (
+    <section className="rounded-xl border border-slate-200/60 bg-slate-100/10 p-3 text-white sm:p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div>
+          <h3 className="font-serif text-sm font-bold text-slate-100">Distribute Creation Points</h3>
+          <p className="text-[11px] text-white/65">All 5 points must be spent before continuing.</p>
+        </div>
+        <span className="shrink-0 rounded-full border border-slate-200/40 bg-slate-100/10 px-2.5 py-1 text-xs font-bold text-white">
+          {remaining} left
+        </span>
+      </div>
+      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+        {ALLOCATION_STATS.map(({ key, label, effect }) => (
+          <div key={key} className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/20 px-2.5 py-2">
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-white">
+                {label} <span className="font-normal text-white/65">{11 + allocatedStats[key]} total</span>
+              </div>
+              <div className="text-[10px] text-white/55">{effect}</div>
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                aria-label={`Remove one ${label} point`}
+                disabled={allocatedStats[key] === 0}
+                onClick={() => adjust(key, -1)}
+                className="rounded-md border border-white/20 p-1 text-white hover:bg-white/10 disabled:opacity-30"
+              >
+                <Minus size={13} />
+              </button>
+              <span className="w-4 text-center font-mono text-xs">{allocatedStats[key]}</span>
+              <button
+                type="button"
+                aria-label={`Add one ${label} point`}
+                disabled={remaining === 0}
+                onClick={() => adjust(key, 1)}
+                className="rounded-md border border-white/20 p-1 text-white hover:bg-white/10 disabled:opacity-30"
+              >
+                <Plus size={13} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-1.5 text-[11px] sm:grid-cols-4">
+        <div className="rounded-md bg-black/25 px-2 py-1.5">Preview HP: <b>{hp}</b></div>
+        <div className="rounded-md bg-black/25 px-2 py-1.5">Preview MP: <b>{mp}</b></div>
+        <div className="rounded-md bg-black/25 px-2 py-1.5">Preview ATK: <b>{attack.toFixed(1)}</b></div>
+        <div className="rounded-md bg-black/25 px-2 py-1.5">Preview DEF: <b>{defense.toFixed(1)}</b> · Crit {crit.toFixed(1)}%</div>
+      </div>
+    </section>
+  );
+}
+
 function ClassScreen({
   selectedClass,
+  allocatedStats,
   onSelect,
+  onAllocationChange,
   onNext,
   onBack,
 }: {
   selectedClass: string | null;
+  allocatedStats: ClassAttributes;
   onSelect: (id: string) => void;
+  onAllocationChange: (next: ClassAttributes) => void;
   onNext: () => void;
   onBack: () => void;
 }) {
   const cls = selectedClass ? CLASS_LIST.find((c) => c.id === selectedClass) ?? null : null;
+  const allocationSpent = Object.values(allocatedStats).reduce((sum, value) => sum + value, 0);
+  const canContinue = !!selectedClass && (selectedClass !== 'allrounder' || allocationSpent === 5);
 
   return (
-    <div className="flex w-full max-w-2xl flex-col gap-3">
+    <div className="flex w-full max-w-4xl flex-col gap-3">
       {/* Header */}
       <div className="text-center">
         <h2 className="font-serif text-2xl font-bold text-white drop-shadow-lg tracking-wide">
@@ -180,20 +294,28 @@ function ClassScreen({
         </p>
       </div>
 
-      {/* Class row — 4 equal boxes */}
-      <div className="grid grid-cols-4 gap-3">
-        {CLASS_LIST.map((c) => (
-          <ClassButton
-            key={c.id}
-            cls={c}
-            selected={selectedClass === c.id}
-            onSelect={() => onSelect(c.id)}
-          />
-        ))}
+      {/* Keep all five class cards in one row; narrow screens can scroll the row. */}
+      <div className="w-full overflow-x-auto pb-1">
+        <div className="grid min-w-[680px] grid-cols-5 gap-2">
+          {CLASS_LIST.map((c) => (
+            <ClassButton
+              key={c.id}
+              cls={c}
+              selected={selectedClass === c.id}
+              onSelect={() => onSelect(c.id)}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Skills panel — only when a class is selected */}
       {cls && <SkillsPanel cls={cls} />}
+      {selectedClass === 'allrounder' && (
+        <AllrounderPointAllocation
+          allocatedStats={allocatedStats}
+          onChange={onAllocationChange}
+        />
+      )}
 
       {/* Action buttons */}
       <div className="flex items-center gap-3 mt-1">
@@ -206,12 +328,16 @@ function ClassScreen({
         </button>
         <button
           type="button"
-          disabled={!selectedClass}
+          disabled={!canContinue}
           onClick={onNext}
           className="flex-1 flex items-center justify-center gap-2 rounded-xl border-2 border-primary/80 bg-primary px-6 py-3 font-serif text-sm font-bold uppercase tracking-widest text-black shadow-[0_0_24px_rgba(244,195,86,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-transform disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
         >
           <Swords size={16} />
-          {cls ? `Continue as ${cls.name}` : 'Select a Class'}
+          {!cls
+            ? 'Select a Class'
+            : selectedClass === 'allrounder' && allocationSpent < 5
+              ? `Spend ${5 - allocationSpent} Point${5 - allocationSpent === 1 ? '' : 's'} to Continue`
+              : `Continue as ${cls.name}`}
           <ChevronRight size={16} />
         </button>
       </div>
@@ -336,10 +462,21 @@ export function TitleScreen() {
   const [selectedClass, setSelectedClass] = useState<string | null>(null);
   const [gender, setGender] = useState<'male' | 'female'>('male');
   const [name, setName] = useState(DEFAULT_NAMES.male);
+  const [allocatedStats, setAllocatedStats] = useState<ClassAttributes>({ ...EMPTY_ALLOCATION });
 
   function handleStart() {
     if (!name.trim() || !selectedClass) return;
-    startNewGame(name.trim(), gender, selectedClass);
+    startNewGame(
+      name.trim(),
+      gender,
+      selectedClass,
+      selectedClass === 'allrounder' ? allocatedStats : undefined,
+    );
+  }
+
+  function handleClassSelect(id: string) {
+    if (id !== selectedClass) setAllocatedStats({ ...EMPTY_ALLOCATION });
+    setSelectedClass(id);
   }
 
   function handleGenderChange(g: 'male' | 'female') {
@@ -391,7 +528,9 @@ export function TitleScreen() {
         {step === 'class' && (
           <ClassScreen
             selectedClass={selectedClass}
-            onSelect={setSelectedClass}
+            allocatedStats={allocatedStats}
+            onSelect={handleClassSelect}
+            onAllocationChange={setAllocatedStats}
             onNext={() => setStep('gender')}
             onBack={() => setStep('landing')}
           />
