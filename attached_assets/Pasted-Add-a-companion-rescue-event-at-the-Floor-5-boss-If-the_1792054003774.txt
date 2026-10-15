@@ -1,0 +1,91 @@
+Add a companion rescue event at the Floor 5 boss. If the player defeats the boss, they can rescue a second character and choose whether to recruit them.
+
+TRIGGER:
+- Floor 5 boss is defeated → rescue event starts before the floor reward screen
+- Event title: "A Stranger in Chains" (rename freely)
+- Story text (display one line at a time, tap to continue):
+  "The boss falls, and behind its throne you find a captive adventurer, weak but alive."
+  "They look up at you and whisper: 'Thank you. I thought no one would come.'"
+
+COMPANION GENERATION (RANDOM):
+- Class: random from the 5 classes, EXCLUDING the player's class
+  - Example: player is Warrior → companion is Mage, Rogue, Paladin, or Allrounder
+- Gender: random (male or female)
+- Name: random from a name pool (create at least 10 male and 10 female names)
+- Level: player level minus 1, minimum 1
+  - Player level 6 → companion level 5
+  - Player level 1 → companion level 1
+- Companion's starting stats and skills follow their class rules (Allrounder rules apply if companion is Allrounder)
+- Companion gets starter gear for their class
+
+CHOICE SCREEN:
+Show a card with:
+- Companion name, gender, class, level
+- Class role description
+- HP, Mana, and attributes
+- Two buttons:
+  - "Recruit to your party"
+  - "Continue alone" (companion stays behind, and the event does not happen again on this run)
+
+IF RECRUITED:
+- Companion joins the party
+- Party size limit: player + 1 companion (for now)
+- Show message: "[Name] joins your party!"
+
+IF NOT RECRUITED:
+- Show message: "[Name] thanks you and leaves the dungeon."
+- Event is marked as completed for this dungeon run
+
+COMPANION IN COMBAT:
+- Turn-based: on each turn, the player chooses an action for themselves AND for the companion
+- Companion has its own HP and Mana bars shown next to the player's bars
+- Companion can use its class skills, following the class-exclusive skill rules
+- Companion uses basic attacks by default if no action is selected
+- Companion death:
+  - Companion is knocked out (not removed permanently)
+  - Companion revives with 30% HP at the start of the next floor
+  - If the player dies, the run ends as normal
+
+COMPANION PROGRESSION:
+- Companion gains XP from battles: 50% of the XP the player earns
+- Companion levels up with the same XP table as the player
+- Companion stat growth follows its class growth rules
+- Companion level is shown on the party panel
+
+PARTY PANEL UI:
+- Small panel showing both characters: name, class, level, HP, Mana
+- Click companion card to see full details
+- On mobile, party panel can be collapsed
+
+DATA TO SAVE (localStorage):
+{
+  party: {
+    companion: {
+      name: "Aarav",
+      gender: "male",
+      class: "mage",
+      level: 5,
+      hp: 60,
+      maxHp: 75,
+      mana: 80,
+      maxMana: 100,
+      xp: 120,
+      skills: ["fireball"],
+      isKnockedOut: false
+    } | null
+  },
+  companionEventCompleted: true
+}
+
+TESTING CHECKLIST:
+- ✓ Event triggers only after Floor 5 boss is defeated
+- ✓ Companion class is never the same as the player's class
+- ✓ Companion level is player level minus 1 (minimum 1)
+- ✓ Recruit button adds companion to party
+- ✓ Continue alone button skips companion without errors
+- ✓ Player chooses actions for both characters in combat
+- ✓ Companion uses only class-allowed skills
+- ✓ Companion knocked out and revives on next floor at 30% HP
+- ✓ Companion gains 50% of player XP
+- ✓ Party saves and loads correctly
+- ✓ Party panel displays correctly on mobile

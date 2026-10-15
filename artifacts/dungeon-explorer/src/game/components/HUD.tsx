@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import { Backpack, Coins, Flame, Heart, Snowflake, Sparkles, Star, Swords, Wind } from 'lucide-react';
 import { getPlayerEffectiveStats, useGameStore } from '../store';
+import { CLASSES } from '../classData';
+import type { CompanionCharacter } from '../types';
 
 function StatBar({
   value,
@@ -93,11 +96,67 @@ function TerrainStatus() {
   );
 }
 
+function CompanionPartyCard({ companion }: { companion: CompanionCharacter }) {
+  const [expanded, setExpanded] = useState(true);
+  const stats = getPlayerEffectiveStats(companion);
+  const cls = CLASSES[companion.heroClass];
+
+  return (
+    <div className="min-w-[210px] flex-1 rounded-lg border border-secondary/25 bg-background/30 p-2.5">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((value) => !value)}
+        className="flex w-full items-center justify-between gap-2 text-left"
+      >
+        <span className="min-w-0">
+          <span className="block truncate font-serif text-sm font-semibold text-foreground">
+            {companion.name}
+          </span>
+          <span className="block text-[10px] text-muted-foreground">
+            {cls?.name ?? companion.heroClass} · Lv. {companion.level}
+          </span>
+        </span>
+        <span className={`shrink-0 text-[10px] font-semibold ${companion.isKnockedOut ? 'text-destructive' : 'text-secondary'}`}>
+          {companion.isKnockedOut ? 'Knocked out' : expanded ? 'Hide details' : 'Details'}
+        </span>
+      </button>
+      {expanded && (
+        <div className="mt-2 flex flex-col gap-1.5">
+          <StatBar
+            value={companion.currentHp}
+            max={stats.maxHp}
+            colorClass="bg-destructive"
+            icon={<Heart size={12} />}
+          />
+          <StatBar
+            value={companion.currentMp}
+            max={stats.maxMp}
+            colorClass="bg-secondary"
+            icon={<Sparkles size={12} />}
+          />
+          <div className="border-t border-white/10 pt-1.5 text-[10px] leading-relaxed text-muted-foreground">
+            Attributes: STR {companion.classAttributes.str} · DEX {companion.classAttributes.dex} · INT {companion.classAttributes.int} · CON {companion.classAttributes.con}
+            <br />
+            Skills: {companion.skillIds.map((id) => id.replace(/([A-Z])/g, ' $1')).join(', ') || 'Basic attack'}
+            {companion.isKnockedOut && (
+              <span className="mt-1 block font-semibold text-destructive">
+                Revives with 30% HP on the next floor.
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function HUD({ onOpenInventory }: { onOpenInventory: () => void }) {
   const player = useGameStore((s) => s.player);
   const playerHp = useGameStore((s) => s.playerHp);
   const playerMp = useGameStore((s) => s.playerMp);
   const dungeon = useGameStore((s) => s.dungeon);
+  const companion = useGameStore((s) => s.companion);
   const stats = getPlayerEffectiveStats(player);
 
   return (
@@ -110,12 +169,17 @@ export function HUD({ onOpenInventory }: { onOpenInventory: () => void }) {
             </span>
             <span className="text-xs text-muted-foreground">Lv. {player.level}</span>
           </div>
+          <span className="text-[10px] text-muted-foreground">
+            {CLASSES[player.heroClass]?.name ?? player.heroClass}
+          </span>
           <div className="flex flex-col gap-1">
             <StatBar value={playerHp} max={stats.maxHp} colorClass="bg-destructive" icon={<Heart size={14} />} />
             <StatBar value={playerMp} max={stats.maxMp} colorClass="bg-secondary" icon={<Sparkles size={14} />} />
           </div>
           <TerrainStatus />
         </div>
+
+        {companion && <CompanionPartyCard companion={companion} />}
 
         <div className="flex flex-col items-end gap-1 text-right">
           <div className="flex items-center gap-1.5 text-sm font-medium text-primary">

@@ -1,17 +1,20 @@
 import { useState, useEffect } from 'react';
 import { Flame, Heart, Package, Shield, Sparkles, Swords, TowerControl } from 'lucide-react';
 import { getAvailableSkills, getPlayerEffectiveStats, useGameStore } from '../store';
+import type { CompanionBattleAction } from '../types';
 
 type Panel = 'root' | 'skills' | 'items';
 
 export function BattleOverlay() {
   const battle = useGameStore((s) => s.battle);
   const player = useGameStore((s) => s.player);
+  const companion = useGameStore((s) => s.companion);
   const playerHp = useGameStore((s) => s.playerHp);
   const playerMp = useGameStore((s) => s.playerMp);
   const battleAction = useGameStore((s) => s.battleAction);
   const [panel, setPanel] = useState<Panel>('root');
   const [targetIndex, setTargetIndex] = useState(0);
+  const [companionAction, setCompanionAction] = useState<CompanionBattleAction | null>(null);
 
   // Auto-advance target to the next alive enemy whenever the current one dies.
   useEffect(() => {
@@ -25,6 +28,8 @@ export function BattleOverlay() {
   if (!battle) return null;
   const stats = getPlayerEffectiveStats(player);
   const skills = getAvailableSkills(player);
+  const companionStats = companion ? getPlayerEffectiveStats(companion) : null;
+  const companionSkills = companion ? getAvailableSkills(companion) : [];
   const aliveEnemies = battle.enemies.filter((e) => e.stats.hp > 0);
   const effectiveTarget = (() => {
     if (battle.enemies[targetIndex]?.stats.hp > 0) return targetIndex;
@@ -33,8 +38,13 @@ export function BattleOverlay() {
   })();
 
   function act(action: 'attack' | 'skill' | 'item' | 'defend' | 'flee', extra?: { skillId?: string; itemId?: string }) {
-    battleAction(action, { ...extra, targetIndex: effectiveTarget });
+    battleAction(action, {
+      ...extra,
+      targetIndex: effectiveTarget,
+      companionAction: companionAction ?? undefined,
+    });
     setPanel('root');
+    setCompanionAction(null);
   }
 
   return (
@@ -108,6 +118,58 @@ export function BattleOverlay() {
             <span>Target: {battle.enemies[effectiveTarget]?.name}</span>
           )}
         </div>
+
+        {companion && companionStats && (
+          <section className="mb-3 rounded-lg border border-secondary/25 bg-secondary/5 p-2.5">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs font-semibold text-foreground">
+                {companion.name} · Lv. {companion.level}
+                {companion.isKnockedOut
+                  ? <span className="ml-2 text-destructive">Knocked out</span>
+                  : <span className="ml-2 text-muted-foreground">{companion.currentHp}/{companionStats.maxHp} HP · {companion.currentMp}/{companionStats.maxMp} MP</span>}
+              </div>
+              <span className="text-[10px] text-muted-foreground">
+                Companion action: {companionAction?.type === 'skill'
+                  ? companionSkills.find((skill) => skill.id === companionAction.skillId)?.name ?? 'Skill'
+                  : companionAction?.type === 'attack' ? 'Basic attack' : 'Basic attack (default)'}
+              </span>
+            </div>
+            {!companion.isKnockedOut && (
+              <div className="flex max-h-20 flex-wrap gap-1.5 overflow-y-auto">
+                <button
+                  type="button"
+                  onClick={() => setCompanionAction({ type: 'attack', targetIndex: effectiveTarget })}
+                  className={`rounded-md border px-2 py-1.5 text-[11px] font-medium ${
+                    companionAction?.type === 'attack'
+                      ? 'border-secondary bg-secondary/20 text-foreground'
+                      : 'border-card-border bg-card text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Basic attack
+                </button>
+                {companionSkills.map((skill) => (
+                  <button
+                    key={skill.id}
+                    type="button"
+                    disabled={skill.mpCost > companion.currentMp}
+                    onClick={() => setCompanionAction({
+                      type: 'skill',
+                      skillId: skill.id,
+                      targetIndex: effectiveTarget,
+                    })}
+                    className={`rounded-md border px-2 py-1.5 text-[11px] font-medium disabled:cursor-not-allowed disabled:opacity-35 ${
+                      companionAction?.type === 'skill' && companionAction.skillId === skill.id
+                        ? 'border-secondary bg-secondary/20 text-foreground'
+                        : 'border-card-border bg-card text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {skill.name} · {skill.mpCost} MP
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {panel === 'root' && (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">

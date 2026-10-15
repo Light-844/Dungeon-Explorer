@@ -8,7 +8,7 @@ import {
   SKILL_UNLOCK_ORDER,
   SKILLS,
 } from './gameData';
-import { canClassEquipWeapon, CLASSES } from './classData';
+import { canClassEquipWeapon, CLASS_LIST, CLASSES } from './classData';
 import { generateDungeonLevel, tileTypeIsWalkable } from './dungeonGenerator';
 import {
   canLearnSkill,
@@ -29,6 +29,8 @@ import {
 import type {
   BattleLogEntry,
   ClassAttributes,
+  CompanionBattleAction,
+  CompanionCharacter,
   DungeonLevel,
   EnemyInstance,
   EquipSlot,
@@ -48,6 +50,76 @@ function randChoice<T>(arr: T[]): T {
 }
 function uid(): string {
   return Math.random().toString(36).slice(2, 10);
+}
+
+const PARTY_STORAGE_KEY = 'dungeon-explorer-party-v1';
+const MALE_COMPANION_NAMES = [
+  'Aarav', 'Vihaan', 'Arjun', 'Kabir', 'Ishaan',
+  'Rohan', 'Dev', 'Neel', 'Kian', 'Reyansh',
+  'Aditya', 'Shaurya',
+];
+const FEMALE_COMPANION_NAMES = [
+  'Anaya', 'Diya', 'Ira', 'Meera', 'Tara',
+  'Aditi', 'Sana', 'Kiara', 'Myra', 'Avni',
+  'Ishita', 'Nisha',
+];
+
+interface SavedPartyData {
+  party: { companion: CompanionCharacter | null };
+  companionEventCompleted: boolean;
+}
+
+function isCompanionCharacter(value: unknown): value is CompanionCharacter {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<CompanionCharacter>;
+  return (
+    typeof candidate.name === 'string' &&
+    (candidate.gender === 'male' || candidate.gender === 'female') &&
+    typeof candidate.heroClass === 'string' &&
+    !!CLASSES[candidate.heroClass] &&
+    typeof candidate.level === 'number' &&
+    typeof candidate.currentHp === 'number' &&
+    typeof candidate.currentMp === 'number' &&
+    typeof candidate.isKnockedOut === 'boolean' &&
+    Array.isArray(candidate.skillIds)
+  );
+}
+
+function loadSavedParty(): Pick<GameState, 'companion' | 'companionEventCompleted'> {
+  if (typeof localStorage === 'undefined') {
+    return { companion: null, companionEventCompleted: false };
+  }
+  try {
+    const raw = localStorage.getItem(PARTY_STORAGE_KEY);
+    if (!raw) return { companion: null, companionEventCompleted: false };
+    const saved = JSON.parse(raw) as Partial<SavedPartyData>;
+    const companion = isCompanionCharacter(saved.party?.companion)
+      ? sanitizePlayerSkills(saved.party.companion)
+      : null;
+    return {
+      companion,
+      companionEventCompleted: saved.companionEventCompleted === true,
+    };
+  } catch (error) {
+    console.warn('Could not load the saved companion party.', error);
+    return { companion: null, companionEventCompleted: false };
+  }
+}
+
+function saveParty(
+  companion: CompanionCharacter | null,
+  companionEventCompleted: boolean,
+): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const saved: SavedPartyData = {
+      party: { companion },
+      companionEventCompleted,
+    };
+    localStorage.setItem(PARTY_STORAGE_KEY, JSON.stringify(saved));
+  } catch (error) {
+    console.warn('Could not save the companion party.', error);
+  }
 }
 
 function freshPlayer(
@@ -115,9 +187,58 @@ function freshPlayer(
   };
 }
 
+function createRescueCompanion(player: PlayerCharacter): CompanionCharacter {
+  const availableClasses = CLASS_LIST.filter((cls) => cls.id !== player.heroClass);
+  const cls = randChoice(availableClasses);
+  const gender = Math.random() < 0.5 ? 'male' : 'female';
+  const name = randChoice(gender === 'male' ? MALE_COMPANION_NAMES : FEMALE_COMPANION_NAMES);
+  const level = Math.max(1, player.level - 1);
+  const allrounderAllocation =
+    cls.id === 'allrounder' ? { str: 1, dex: 1, int: 1, con: 2 } : undefined;
+  let companion = freshPlayer(name, gender, cls.id, allrounderAllocation);
+  let baseStats = { ...companion.baseStats };
+  let skillIds = [...companion.skillIds];
+  let statPoints = companion.statPoints;
+
+  for (let nextLevel = 2; nextLevel <= level; nextLevel++) {
+    const gains = autoStatGainsForLevelUp(cls.id);
+    for (const key of Object.keys(gains) as (keyof Stats)[]) {
+      baseStats[key] += gains[key] ?? 0;
+    }
+    baseStats.hp = baseStats.maxHp;
+    baseStats.mp = baseStats.maxMp;
+    statPoints += STAT_POINTS_PER_LEVEL;
+    const newSkills = SKILL_UNLOCK_ORDER.filter(
+      (skill) =>
+        getSkillUnlockLevel(skill, cls.id) === nextLevel &&
+        !skillIds.includes(skill.id) &&
+        canLearnSkill(skill, { heroClass: cls.id }),
+    );
+    skillIds = [...skillIds, ...newSkills.map((skill) => skill.id)];
+  }
+
+  companion = {
+    ...companion,
+    level,
+    xp: 0,
+    xpToNext: xpToNextLevel(level),
+    baseStats,
+    skillIds,
+    statPoints,
+  };
+  const stats = effectivePlayerStats(companion);
+  return {
+    ...companion,
+    currentHp: stats.maxHp,
+    currentMp: stats.maxMp,
+    isKnockedOut: false,
+  };
+}
+
 export interface BattleState {
   enemies: EnemyInstance[];
   playerBuffs: Partial<Record<keyof Stats, number>>;
+  companionBuffs: Partial<Record<keyof Stats, number>>;
   turn: 'player' | 'enemy' | 'resolving';
   log: BattleLogEntry[];
   targetIndex: number;
@@ -140,6 +261,10 @@ function themeHasHazard(themeId: string): boolean {
 interface GameState {
   mode: GameMode;
   player: PlayerCharacter;
+  companion: CompanionCharacter | null;
+  rescueEventCompanion: CompanionCharacter | null;
+  companionEventCompleted: boolean;
+  rescueStoryIndex: number;
   playerHp: number;
   playerMp: number;
   dungeon: DungeonLevel | null;
@@ -168,6 +293,9 @@ interface GameState {
     heroClass: string,
     allocatedStats?: ClassAttributes,
   ) => void;
+  advanceRescueStory: () => void;
+  recruitCompanion: () => void;
+  declineCompanion: () => void;
   movePlayer: (dx: number, dy: number) => void;
   openChest: () => void;
   interactShop: () => void;
@@ -182,7 +310,12 @@ interface GameState {
   descendStairs: () => void;
   battleAction: (
     action: 'attack' | 'skill' | 'item' | 'defend' | 'flee',
-    payload?: { skillId?: string; itemId?: string; targetIndex?: number },
+    payload?: {
+      skillId?: string;
+      itemId?: string;
+      targetIndex?: number;
+      companionAction?: CompanionBattleAction;
+    },
   ) => void;
   useItem: (itemId: string) => void;
   clearMessage: () => void;
@@ -222,9 +355,123 @@ function pushLog(
   battle.log = [...battle.log, { id: uid(), text, tone }].slice(-40);
 }
 
+function runCompanionTurn(
+  companion: CompanionCharacter | null,
+  battle: BattleState,
+  action: CompanionBattleAction | undefined,
+  targetIndex: number,
+): { companion: CompanionCharacter | null; escaped: boolean } {
+  if (!companion || companion.isKnockedOut || companion.currentHp <= 0) {
+    return { companion, escaped: false };
+  }
+
+  const stats = computeEffectiveStats(
+    effectivePlayerStats(companion),
+    battle.companionBuffs,
+  );
+  let hp = companion.currentHp;
+  let mp = companion.currentMp;
+  const selectedSkill =
+    action?.type === 'skill' && action.skillId ? SKILLS[action.skillId] : undefined;
+  const skillAllowed =
+    !!selectedSkill &&
+    companion.skillIds.includes(selectedSkill.id) &&
+    canLearnSkill(selectedSkill, companion);
+  let useSkill = skillAllowed && selectedSkill!.mpCost <= mp;
+  let escaped = false;
+
+  if (action?.type === 'skill' && !skillAllowed) {
+    pushLog(battle, `${companion.name} cannot use that skill.`, 'system');
+  } else if (action?.type === 'skill' && skillAllowed && selectedSkill!.mpCost > mp) {
+    pushLog(battle, `${companion.name} is out of mana and uses a basic attack instead.`, 'system');
+  }
+
+  if (useSkill) {
+    const skill = selectedSkill!;
+    mp -= skill.mpCost;
+    if (skill.guaranteedFlee) {
+      escaped = true;
+      pushLog(battle, `${companion.name} uses ${skill.name} to help the party escape!`, 'system');
+    } else if (skill.target === 'self') {
+      if (skill.healPercent) {
+        const healing = Math.round(stats.maxHp * skill.healPercent);
+        hp = Math.min(stats.maxHp, hp + healing);
+        pushLog(battle, `${companion.name} uses ${skill.name} and restores ${healing} HP.`, 'heal');
+      }
+      if (skill.healAmount) {
+        hp = Math.min(stats.maxHp, hp + skill.healAmount);
+        pushLog(battle, `${companion.name} uses ${skill.name} and heals ${skill.healAmount} HP.`, 'heal');
+      }
+      for (const [key, value] of Object.entries(skill.statBuff ?? {}) as [keyof Stats, number][]) {
+        battle.companionBuffs[key] = (battle.companionBuffs[key] ?? 0) + value;
+      }
+      if (skill.statBuff) pushLog(battle, `${companion.name} uses ${skill.name}.`, 'system');
+    } else {
+      const requestedTarget = action?.targetIndex ?? targetIndex;
+      const resolvedTarget = battle.enemies[requestedTarget]?.stats.hp > 0
+        ? requestedTarget
+        : battle.enemies.findIndex((enemy) => enemy.stats.hp > 0);
+      const targets =
+        skill.target === 'allEnemies'
+          ? battle.enemies.filter((enemy) => enemy.stats.hp > 0)
+          : resolvedTarget >= 0 && battle.enemies[resolvedTarget]?.stats.hp
+            ? [battle.enemies[resolvedTarget]!]
+            : [];
+      for (const enemy of targets) {
+        const damage =
+          skill.type === 'magic'
+            ? calcMagicDamage(
+                stats.matk,
+                enemy.stats.mdef,
+                skill.power,
+                stats.luck,
+                skill.element,
+                enemy.weakness,
+                enemy.resist,
+              )
+            : calcPhysicalDamage(
+                stats.atk,
+                enemy.stats.def,
+                skill.power,
+                stats.luck,
+                skill.guaranteedCrit,
+              );
+        enemy.stats = { ...enemy.stats, hp: Math.max(0, enemy.stats.hp - damage.amount) };
+        pushLog(
+          battle,
+          `${companion.name}'s ${skill.name} hits ${enemy.name} for ${damage.amount}${damage.isWeak ? ' (weak!)' : damage.isCrit ? ' (Critical!)' : ''}.`,
+          damage.isWeak || damage.isCrit ? 'crit' : 'damage',
+        );
+      }
+    }
+  } else if (!escaped) {
+    const requestedTarget = action?.targetIndex ?? targetIndex;
+    const target =
+      (battle.enemies[requestedTarget]?.stats.hp > 0 && battle.enemies[requestedTarget]) ||
+      battle.enemies.find((enemy) => enemy.stats.hp > 0);
+    if (target) {
+      const damage = calcPhysicalDamage(stats.atk, target.stats.def, 1, stats.luck);
+      target.stats = { ...target.stats, hp: Math.max(0, target.stats.hp - damage.amount) };
+      pushLog(
+        battle,
+        `${companion.name} attacks ${target.name} for ${damage.amount}${damage.isCrit ? ' (Critical!)' : ''}.`,
+        damage.isCrit ? 'crit' : 'damage',
+      );
+    }
+  }
+
+  return {
+    companion: { ...companion, currentHp: hp, currentMp: mp },
+    escaped,
+  };
+}
+
 export const useGameStore = create<GameState>((set, get) => ({
   mode: 'title',
   player: sanitizePlayerSkills(freshPlayer()),
+  ...loadSavedParty(),
+  rescueEventCompanion: null,
+  rescueStoryIndex: 0,
   playerHp: 42,
   playerMp: 18,
   dungeon: null,
@@ -267,6 +514,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({
       mode: 'exploring',
       player,
+      companion: null,
+      rescueEventCompanion: null,
+      companionEventCompleted: false,
+      rescueStoryIndex: 0,
       playerHp: stats.maxHp,
       playerMp: stats.maxMp,
       dungeon,
@@ -280,6 +531,40 @@ export const useGameStore = create<GameState>((set, get) => ({
       terrainDamageInterval: 0,
       swampMoveCooldownMs: 0,
     });
+    saveParty(null, false);
+  },
+
+  advanceRescueStory: () =>
+    set((state) => ({
+      rescueStoryIndex: Math.min(2, state.rescueStoryIndex + 1),
+    })),
+  recruitCompanion: () => {
+    const companion = get().rescueEventCompanion;
+    if (!companion) return;
+    set({
+      mode: 'exploring',
+      companion,
+      rescueEventCompanion: null,
+      companionEventCompleted: true,
+      rescueStoryIndex: 0,
+      message: `${companion.name} joins your party!`,
+      messageTone: 'success',
+    });
+    saveParty(companion, true);
+  },
+  declineCompanion: () => {
+    const companion = get().rescueEventCompanion;
+    if (!companion) return;
+    set({
+      mode: 'exploring',
+      companion: null,
+      rescueEventCompanion: null,
+      companionEventCompleted: true,
+      rescueStoryIndex: 0,
+      message: `${companion.name} thanks you and leaves the dungeon.`,
+      messageTone: 'info',
+    });
+    saveParty(null, true);
   },
 
   returnToTitle: () => set({ mode: 'title' }),
@@ -554,7 +839,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   descendStairs: () => {
-    const { dungeon, playerPos, player } = get();
+    const { dungeon, playerPos, player, companion, companionEventCompleted } = get();
     if (!dungeon) return;
     const tile = dungeon.tiles[playerPos.y]?.[playerPos.x];
     if (!tile || tile.type !== 'stairsDown') return;
@@ -571,22 +856,38 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const nextFloor = dungeon.floor + 1;
     if (nextFloor > 5) {
+      const title = player.title ?? "Conqueror of Pantheon's Dungeon";
+      const nextCompanion = companion
+        ? { ...companion, title: companion.title ?? title, expPenaltyActive: false }
+        : null;
       set({
         player: {
           ...consumeItem(player, 'dungeonKey'),
-          title: player.title ?? "Conqueror of Pantheon's Dungeon",
+          title,
           expPenaltyActive: false,
         },
+        companion: nextCompanion,
         mode: 'victory',
       });
+      saveParty(nextCompanion, companionEventCompleted);
       return;
     }
     const nextDungeon = generateDungeonLevel(nextFloor);
     const nextPlayer = consumeItem(player, 'dungeonKey');
     const stats = effectivePlayerStats(nextPlayer);
+    let nextCompanion = companion;
+    if (nextCompanion?.isKnockedOut) {
+      const companionStats = effectivePlayerStats(nextCompanion);
+      nextCompanion = {
+        ...nextCompanion,
+        currentHp: Math.max(1, Math.floor(companionStats.maxHp * 0.3)),
+        isKnockedOut: false,
+      };
+    }
     set({
       dungeon: nextDungeon,
       player: nextPlayer,
+      companion: nextCompanion,
       playerPos: { ...nextDungeon.startPos },
       playerHp: Math.min(get().playerHp + Math.round(stats.maxHp * 0.15), stats.maxHp),
       message: `Floor ${nextFloor} — ${nextDungeon.theme.name}`,
@@ -600,6 +901,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       terrainDamageInterval: 0,
       swampMoveCooldownMs: 0,
     });
+    saveParty(nextCompanion, companionEventCompleted);
   },
 
   battleAction: (action, payload) => {
@@ -610,6 +912,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       enemies: state.battle.enemies.map((e) => ({ ...e, stats: { ...e.stats } })),
     };
     const player = state.player;
+    let companion = state.companion;
     if (action === 'skill' && payload?.skillId) {
       const requestedSkill = SKILLS[payload.skillId];
       const message =
@@ -786,15 +1089,28 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
     }
 
+    if (!fled) {
+      const companionTurn = runCompanionTurn(
+        companion,
+        battle,
+        payload?.companionAction,
+        targetIdx,
+      );
+      companion = companionTurn.companion;
+      if (companionTurn.escaped) fled = true;
+    }
+
     if (fled) {
       set({
         mode: 'exploring',
         battle: null,
+        companion,
         playerHp,
         playerMp,
-        message: 'You escaped the fight.',
+        message: 'Your party escaped the fight.',
         messageTone: 'warning',
       });
+      saveParty(companion, state.companionEventCompleted);
       return;
     }
 
@@ -809,6 +1125,28 @@ export const useGameStore = create<GameState>((set, get) => ({
       let leveledPlayer = grantXp(playerBeforeXp, awardedXp);
       leveledPlayer = { ...leveledPlayer, gold: leveledPlayer.gold + totalGold };
       const leveledUp = leveledPlayer.level > preLevel;
+      if (companion) {
+        const companionXp =
+          Math.floor(awardedXp * 0.5) *
+          (companion.heroClass === 'allrounder' && companion.expPenaltyActive ? 0.98 : 1);
+        const companionXpAward = Math.floor(companionXp);
+        const previousCompanionLevel = companion.level;
+        const updatedCompanion = grantXp(companion, companionXpAward);
+        const companionStats = effectivePlayerStats(updatedCompanion);
+        const companionLeveled = updatedCompanion.level > previousCompanionLevel;
+        companion = {
+          ...companion,
+          ...updatedCompanion,
+          currentHp: companion.isKnockedOut
+            ? 0
+            : companionLeveled
+              ? companionStats.maxHp
+              : Math.min(companion.currentHp, companionStats.maxHp),
+          currentMp: companionLeveled
+            ? companionStats.maxMp
+            : Math.min(companion.currentMp, companionStats.maxMp),
+        };
+      }
 
       const dropNames: string[] = [];
       for (const enemy of battle.enemies) {
@@ -840,6 +1178,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
 
       const dungeon = get().dungeon;
+      const startRescueEvent =
+        dungeon?.floor === 5 &&
+        battle.enemies.some((enemy) => enemy.isBoss) &&
+        !state.companionEventCompleted &&
+        !companion;
+      const rescueEventCompanion = startRescueEvent
+        ? createRescueCompanion(leveledPlayer)
+        : null;
       if (dungeon && battle.originTileEnemyId) {
         delete dungeon.enemies[battle.originTileEnemyId];
         for (const row of dungeon.tiles) {
@@ -858,8 +1204,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       const finalMp = leveledUp ? newStats.maxMp : Math.min(playerMp, newStats.maxMp) || playerMp;
       const levelUpText = leveledUp ? ' Level up! HP and MP fully restored.' : '';
       set({
-        mode: 'exploring',
+        mode: startRescueEvent ? 'rescue' : 'exploring',
         battle: null,
+        companion,
+        rescueEventCompanion,
+        rescueStoryIndex: startRescueEvent ? 0 : get().rescueStoryIndex,
         playerHp: finalHp,
         playerMp: finalMp,
         player: leveledPlayer,
@@ -867,14 +1216,23 @@ export const useGameStore = create<GameState>((set, get) => ({
         message: `Victory! +${awardedXp} XP${xpPenaltyActive ? ' (2% Allrounder penalty)' : ''}, +${totalGold} gold.${dropText}${levelUpText}`,
         messageTone: 'success',
       });
+      saveParty(companion, state.companionEventCompleted);
       return;
     }
 
     // ── Enemy turn(s) ───────────────────────────────────────────────────────
     let hp = playerHp;
+    const companionStats = companion
+      ? computeEffectiveStats(effectivePlayerStats(companion), battle.companionBuffs)
+      : null;
     for (const enemy of battle.enemies) {
       if (enemy.stats.hp <= 0) continue;
       const enemyAction = pickEnemyAction(enemy);
+      const targetCompanion =
+        !!companion &&
+        !companion.isKnockedOut &&
+        companion.currentHp > 0 &&
+        Math.random() < 0.35;
 
       if (enemyAction.type === 'defend') {
         pushLog(battle, `${enemy.name} braces for the next attack.`, 'system');
@@ -884,37 +1242,63 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (enemyAction.type === 'skill') {
         const skill = SKILLS[enemyAction.skillId];
         if (skill) {
-          const defStat = playerDefending ? playerStats.def * 2 : playerStats.def;
-          const mdefStat = playerDefending ? playerStats.mdef * 1.5 : playerStats.mdef;
+          const targetStats = targetCompanion && companionStats ? companionStats : playerStats;
+          const defStat =
+            !targetCompanion && playerDefending ? targetStats.def * 2 : targetStats.def;
+          const mdefStat =
+            !targetCompanion && playerDefending ? targetStats.mdef * 1.5 : targetStats.mdef;
           const dmg =
             skill.type === 'magic'
               ? calcMagicDamage(enemy.stats.matk, mdefStat, skill.power, enemy.stats.luck, skill.element)
               : calcPhysicalDamage(enemy.stats.atk, defStat, skill.power, enemy.stats.luck);
-          hp = Math.max(0, hp - dmg.amount);
-          pushLog(
-            battle,
-            `${enemy.name} uses ${skill.name} for ${dmg.amount}${dmg.isCrit ? ' (Critical!)' : ''}!`,
-            'damage',
-          );
-          if (hp <= 0) break;
+          if (targetCompanion && companion) {
+            const remainingHp = Math.max(0, companion.currentHp - dmg.amount);
+            const isKnockedOut = remainingHp <= 0;
+            companion = { ...companion, currentHp: remainingHp, isKnockedOut };
+            pushLog(
+              battle,
+              `${enemy.name} uses ${skill.name} on ${companion.name} for ${dmg.amount}${dmg.isCrit ? ' (Critical!)' : ''}${isKnockedOut ? ' — knocked out!' : ''}`,
+              'damage',
+            );
+          } else {
+            hp = Math.max(0, hp - dmg.amount);
+            pushLog(
+              battle,
+              `${enemy.name} uses ${skill.name} for ${dmg.amount}${dmg.isCrit ? ' (Critical!)' : ''}!`,
+              'damage',
+            );
+            if (hp <= 0) break;
+          }
           continue;
         }
       }
 
       // Regular attack
+      const targetStats = targetCompanion && companionStats ? companionStats : playerStats;
       const dmg = calcPhysicalDamage(
         enemy.stats.atk,
-        playerDefending ? playerStats.def * 2 : playerStats.def,
+        !targetCompanion && playerDefending ? targetStats.def * 2 : targetStats.def,
         1,
         enemy.stats.luck,
       );
-      hp = Math.max(0, hp - dmg.amount);
-      pushLog(
-        battle,
-        `${enemy.name} attacks you for ${dmg.amount}${dmg.isCrit ? ' (Critical!)' : ''}.`,
-        'damage',
-      );
-      if (hp <= 0) break;
+      if (targetCompanion && companion) {
+        const remainingHp = Math.max(0, companion.currentHp - dmg.amount);
+        const isKnockedOut = remainingHp <= 0;
+        companion = { ...companion, currentHp: remainingHp, isKnockedOut };
+        pushLog(
+          battle,
+          `${enemy.name} attacks ${companion.name} for ${dmg.amount}${dmg.isCrit ? ' (Critical!)' : ''}${isKnockedOut ? ' — knocked out!' : ''}`,
+          'damage',
+        );
+      } else {
+        hp = Math.max(0, hp - dmg.amount);
+        pushLog(
+          battle,
+          `${enemy.name} attacks you for ${dmg.amount}${dmg.isCrit ? ' (Critical!)' : ''}.`,
+          'damage',
+        );
+        if (hp <= 0) break;
+      }
     }
 
     if (hp <= 0) {
@@ -927,21 +1311,26 @@ export const useGameStore = create<GameState>((set, get) => ({
           player: consumeItem(currentPlayer, 'reviveScroll'),
           playerHp: reviveStack.item.healAmount ?? 30,
           playerMp,
+          companion,
           battle: { ...battle, playerBuffs, playerDefending },
           message: 'A Revive Scroll saves you from defeat!',
           messageTone: 'success',
         });
+        saveParty(companion, state.companionEventCompleted);
         return;
       }
-      set({ mode: 'gameover', battle: null, playerHp: 0 });
+      set({ mode: 'gameover', battle: null, playerHp: 0, companion });
+      saveParty(companion, state.companionEventCompleted);
       return;
     }
 
     set({
       playerHp: hp,
       playerMp,
+      companion,
       battle: { ...battle, playerBuffs, playerDefending, targetIndex: targetIdx },
     });
+    saveParty(companion, state.companionEventCompleted);
   },
 
   tickMobWander: () => {
@@ -1277,6 +1666,7 @@ export function startBattleWith(enemyRoot: EnemyInstance, tileEnemyId: string) {
   const battle: BattleState = {
     enemies,
     playerBuffs: startingBuffs,
+    companionBuffs: {},
     turn: 'player',
     log: [
       {

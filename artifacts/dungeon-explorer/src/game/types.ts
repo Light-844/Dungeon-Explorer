@@ -232,7 +232,19 @@ export interface PlayerCharacter {
   statPoints: number;
 }
 
-export type GameMode = 'title' | 'exploring' | 'battle' | 'gameover' | 'victory';
+export interface CompanionCharacter extends PlayerCharacter {
+  currentHp: number;
+  currentMp: number;
+  isKnockedOut: boolean;
+}
+
+export interface CompanionBattleAction {
+  type: 'attack' | 'skill';
+  skillId?: string;
+  targetIndex?: number;
+}
+
+export type GameMode = 'title' | 'exploring' | 'battle' | 'rescue' | 'gameover' | 'victory';
 
 export type BattleActionType = 'attack' | 'skill' | 'item' | 'defend' | 'flee';
 

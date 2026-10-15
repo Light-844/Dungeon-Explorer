@@ -11,6 +11,7 @@ import { InventoryModal } from './InventoryModal';
 import { ShopModal } from './ShopModal';
 import { TitleScreen } from './TitleScreen';
 import { GameOverScreen, VictoryScreen } from './EndScreens';
+import { CompanionRescueEvent } from './CompanionRescueEvent';
 
 // ── Touch D-pad ───────────────────────────────────────────────────────────────
 function DPad() {
@@ -152,7 +153,7 @@ export default function GamePage() {
     <div className="relative h-screen w-full overflow-hidden bg-background text-foreground">
       {mode === 'title' && <TitleScreen />}
 
-      {(mode === 'exploring' || mode === 'battle') && dungeon && (
+      {(mode === 'exploring' || mode === 'battle' || mode === 'rescue') && dungeon && (
         <>
           <DungeonCanvas dungeon={dungeon} />
           <HUD onOpenInventory={() => setInventoryOpen(true)} />
@@ -198,6 +199,7 @@ export default function GamePage() {
           )}
 
           {mode === 'battle' && <BattleOverlay />}
+          {mode === 'rescue' && <CompanionRescueEvent />}
           {inventoryOpen && <InventoryModal onClose={() => setInventoryOpen(false)} />}
           {isShopMessage && <ShopModal onClose={clearMessage} />}
         </>
