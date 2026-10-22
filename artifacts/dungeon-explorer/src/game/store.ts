@@ -40,6 +40,7 @@ import type {
   PlayerCharacter,
   Skill,
   Stats,
+  Tile,
 } from './types';
 
 function randInt(min: number, max: number): number {
@@ -303,6 +304,7 @@ interface GameState {
   recruitCompanion: () => void;
   declineCompanion: () => void;
   movePlayer: (dx: number, dy: number) => void;
+  useExplorationSkill: (skillId: string) => void;
   openChest: () => void;
   interactShop: () => void;
   buyFromShop: (itemId: string) => void;
@@ -382,6 +384,7 @@ function runCompanionTurn(
   const skillAllowed =
     !!selectedSkill &&
     companion.skillIds.includes(selectedSkill.id) &&
+    !selectedSkill.fieldOnly &&
     canLearnSkill(selectedSkill, companion);
   let useSkill = skillAllowed && selectedSkill!.mpCost <= mp;
   let escaped = false;
@@ -634,6 +637,69 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const newCooldown = isSwampSlowed(state) ? Date.now() + 350 : 0;
     set({ playerPos: { x: nx, y: ny }, facing, swampMoveCooldownMs: newCooldown });
+  },
+
+  useExplorationSkill: (skillId) => {
+    const state = get();
+    const skill = SKILLS[skillId];
+    if (state.mode !== 'exploring' || !state.dungeon || !skill) return;
+    if (!state.player.skillIds.includes(skillId) || !canLearnSkill(skill, state.player)) {
+      set({ message: 'You have not learned that skill.', messageTone: 'warning' });
+      return;
+    }
+    if (skillId === 'shadowStep' && state.player.heroClass !== 'rogue') {
+      set({ message: 'Only the Shadow Rogue can use Shadow Step.', messageTone: 'warning' });
+      return;
+    }
+    if (!skill.fieldOnly || skillId !== 'shadowStep') {
+      set({ message: `${skill.name} cannot be used while exploring.`, messageTone: 'warning' });
+      return;
+    }
+    if (state.playerMp < skill.mpCost) {
+      set({
+        message: `Not enough MP for ${skill.name} (${skill.mpCost} MP required).`,
+        messageTone: 'warning',
+      });
+      return;
+    }
+
+    const direction = {
+      up: { x: 0, y: -1 },
+      down: { x: 0, y: 1 },
+      left: { x: -1, y: 0 },
+      right: { x: 1, y: 0 },
+    }[state.facing];
+    let destination: Tile | undefined;
+    for (let step = 1; step <= 3; step++) {
+      const x = state.playerPos.x + direction.x * step;
+      const y = state.playerPos.y + direction.y * step;
+      const tile = state.dungeon.tiles[y]?.[x];
+      if (!tile || !tileTypeIsWalkable(tile.type)) {
+        set({
+          message: 'Shadow Step is blocked before its landing point.',
+          messageTone: 'warning',
+        });
+        return;
+      }
+      destination = tile;
+    }
+    if (!destination) return;
+    if (destination.type === 'enemy' || destination.type === 'trap') {
+      set({
+        message: 'Shadow Step cannot land on an enemy or an untriggered trap.',
+        messageTone: 'warning',
+      });
+      return;
+    }
+
+    destination.discovered = true;
+    set({
+      playerPos: { x: destination.x, y: destination.y },
+      playerMp: state.playerMp - skill.mpCost,
+      swampMoveCooldownMs: 0,
+      message: 'Shadow Step! You teleport three tiles in the facing direction.',
+      messageTone: 'success',
+    });
   },
 
   openChest: () => {
@@ -926,6 +992,8 @@ export const useGameStore = create<GameState>((set, get) => ({
           ? 'You have not learned that skill.'
           : !canLearnSkill(requestedSkill, player)
             ? `Only ${getSkillClassNames(requestedSkill.classes).join(' or ') || 'its assigned class'} can use ${requestedSkill.name}.`
+            : requestedSkill.fieldOnly
+              ? `${requestedSkill.name} can only be used while exploring.`
             : null;
       if (message) {
         pushLog(battle, message, 'system');
@@ -975,7 +1043,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (skill && skill.mpCost <= playerMp) {
         playerMp -= skill.mpCost;
 
-        // ── Shadow Step — guaranteed escape ─────────────────────────────────
+        // ── Generic guaranteed-escape skill handling ────────────────────────
         if (skill.guaranteedFlee) {
           fled = true;
           pushLog(battle, `You vanish into the shadows and escape the battle!`, 'system');

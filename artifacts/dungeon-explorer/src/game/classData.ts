@@ -21,7 +21,7 @@ export interface ClassDef {
   colorPrimary: string;
   colorGlow: string;
   /** Short display summaries of class abilities for the selection screen. */
-  abilities: { name: string; cost: string; desc: string }[];
+  abilities: { name: string; cost: string; desc: string; unlockLevel: number }[];
 }
 
 export const CLASSES: Record<string, ClassDef> = {
@@ -42,7 +42,7 @@ export const CLASSES: Record<string, ClassDef> = {
     starterWeaponId: 'ironLongsword',
     starterArmorId: 'paddedVest',
     weaponTypes: ['sword', 'hammer', 'spear', 'axe'],
-    startingSkillIds: ['whirlwindStrike', 'shieldBash'],
+    startingSkillIds: ['whirlwindStrike'],
     levelUpGains: { maxHp: 7, maxMp: 1 },
     colorPrimary: '#6ba3c8',
     colorGlow: '#6ba3c855',
@@ -51,11 +51,13 @@ export const CLASSES: Record<string, ClassDef> = {
         name: 'Whirlwind Strike',
         cost: '10 MP',
         desc: 'Slice through all enemies at once — 140 % physical damage to each.',
+        unlockLevel: 1,
       },
       {
         name: 'Shield Bash',
         cost: '15 MP',
         desc: 'Slam the target with your shield for 120 % physical damage.',
+        unlockLevel: 3,
       },
     ],
   },
@@ -77,20 +79,22 @@ export const CLASSES: Record<string, ClassDef> = {
     starterWeaponId: 'apprenticeWand',
     starterArmorId: 'silkRobes',
     weaponTypes: ['wand'],
-    startingSkillIds: ['fireball', 'frostNova'],
+    startingSkillIds: ['fireball'],
     levelUpGains: { maxHp: 3, maxMp: 5 },
     colorPrimary: '#9b6bdf',
     colorGlow: '#9b6bdf55',
     abilities: [
       {
         name: 'Fireball',
-        cost: '6 MP',
+        cost: '20 MP',
         desc: 'Hurl a searing fireball — 150 % spell damage, great vs ice enemies.',
+        unlockLevel: 1,
       },
       {
         name: 'Frost Nova',
         cost: '25 MP',
         desc: 'Erupt in an icy shockwave — 150 % area ice damage to all enemies.',
+        unlockLevel: 3,
       },
     ],
   },
@@ -100,7 +104,7 @@ export const CLASSES: Record<string, ClassDef> = {
     name: 'Shadow Rogue',
     role: 'Lethal Agility, Critical Precision & Mobility',
     description:
-      'Lightning-fast and brutally precise. Rogues strike from the shadows for guaranteed crits and can vanish when things go wrong.',
+      'Lightning-fast and brutally precise. Rogues strike from the shadows for guaranteed crits and can blink three tiles ahead to escape danger.',
     baseStats: {
       hp: 90,  maxHp: 90,
       mp: 50,  maxMp: 50,
@@ -112,7 +116,7 @@ export const CLASSES: Record<string, ClassDef> = {
     starterWeaponId: 'twinDaggers',
     starterArmorId: 'shadowLeathers',
     weaponTypes: ['dagger', 'bow', 'sword'],
-    startingSkillIds: ['shadowStrike', 'shadowStep'],
+    startingSkillIds: ['shadowStrike'],
     levelUpGains: { maxHp: 5, maxMp: 2 },
     colorPrimary: '#8b5cf6',
     colorGlow: '#8b5cf655',
@@ -121,11 +125,13 @@ export const CLASSES: Record<string, ClassDef> = {
         name: 'Shadow Strike',
         cost: '15 MP',
         desc: 'A guaranteed critical hit — 250 % physical damage, always lands.',
+        unlockLevel: 1,
       },
       {
         name: 'Shadow Step',
         cost: '20 MP',
-        desc: 'Fade into the shadows — guaranteed escape from any battle.',
+        desc: 'Teleport three tiles in the facing direction, passing over traps and danger.',
+        unlockLevel: 3,
       },
     ],
   },
@@ -147,7 +153,7 @@ export const CLASSES: Record<string, ClassDef> = {
     starterWeaponId: 'warHammer',
     starterArmorId: 'paddedVest',
     weaponTypes: ['hammer', 'sword', 'spear'],
-    startingSkillIds: ['holySmite', 'divineLight'],
+    startingSkillIds: ['holySmite'],
     levelUpGains: { maxHp: 6, maxMp: 3 },
     colorPrimary: '#f0c040',
     colorGlow: '#f0c04055',
@@ -156,11 +162,13 @@ export const CLASSES: Record<string, ClassDef> = {
         name: 'Holy Smite',
         cost: '15 MP',
         desc: 'Strike with divine radiance — 180 % holy magic damage.',
+        unlockLevel: 1,
       },
       {
         name: 'Divine Light',
         cost: '30 MP',
         desc: 'Channel holy grace to restore 40 % of your maximum HP.',
+        unlockLevel: 3,
       },
     ],
   },
@@ -190,11 +198,13 @@ export const CLASSES: Record<string, ClassDef> = {
         name: 'Whirlwind Strike',
         cost: '10 MP',
         desc: 'Slice through all enemies at once — 140 % physical damage to each.',
+        unlockLevel: 1,
       },
       {
         name: 'Fireball',
-        cost: '6 MP',
+        cost: '20 MP',
         desc: 'Hurl a searing fireball — 150 % spell damage, great vs ice enemies.',
+        unlockLevel: 1,
       },
     ],
   },

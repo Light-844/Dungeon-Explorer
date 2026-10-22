@@ -27,9 +27,11 @@ export function BattleOverlay() {
 
   if (!battle) return null;
   const stats = getPlayerEffectiveStats(player);
-  const skills = getAvailableSkills(player);
+  const skills = getAvailableSkills(player).filter((skill) => !skill.fieldOnly);
   const companionStats = companion ? getPlayerEffectiveStats(companion) : null;
-  const companionSkills = companion ? getAvailableSkills(companion) : [];
+  const companionSkills = companion
+    ? getAvailableSkills(companion).filter((skill) => !skill.fieldOnly)
+    : [];
   const aliveEnemies = battle.enemies.filter((e) => e.stats.hp > 0);
   const effectiveTarget = (() => {
     if (battle.enemies[targetIndex]?.stats.hp > 0) return targetIndex;

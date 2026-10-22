@@ -157,7 +157,7 @@ function SkillsPanel({ cls }: { cls: ClassDef }) {
         className="text-xs font-bold uppercase tracking-widest mb-3"
         style={{ color: cls.colorPrimary }}
       >
-        Starting Abilities
+        Class Skills
       </div>
 
       <div className="flex flex-col gap-2">
@@ -172,6 +172,9 @@ function SkillsPanel({ cls }: { cls: ClassDef }) {
           >
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold text-white">{ab.name}</span>
+              <span className="rounded bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/70">
+                {ab.unlockLevel === 1 ? 'Starting' : `Level ${ab.unlockLevel}`}
+              </span>
               <span
                 className="rounded px-2 py-0.5 text-[11px] font-bold font-mono"
                 style={{ backgroundColor: `${cls.colorPrimary}40`, color: cls.colorPrimary }}

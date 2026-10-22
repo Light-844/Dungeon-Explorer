@@ -1,6 +1,6 @@
 ---
 name: Hero Class System
-description: How the 4-class system is structured, initialized, and integrated into store/combat.
+description: How the four base classes and Allrounder are structured, initialized, and integrated into store/combat.
 ---
 
 ## Architecture
@@ -13,7 +13,7 @@ description: How the 4-class system is structured, initialized, and integrated i
 ## Class Skill Hooks
 
 - `guaranteedCrit: true` → `shadowStrike` — always crits, passed as `forceCrit` to `calcPhysicalDamage`.
-- `guaranteedFlee: true` → `shadowStep` — exits battle immediately, checked first in skill branch.
+- `fieldOnly: true` → `shadowStep` — a 20 MP, three-tile facing-direction teleport for exploration; only Shadow Rogue may activate it.
 - `healPercent: 0.4` → `divineLight` — heals `maxHp * 0.4`, computed in battle skill self-target branch.
 
 ## Skill Ownership
@@ -30,13 +30,14 @@ description: How the 4-class system is structured, initialized, and integrated i
 ## Allrounder Rules
 
 - Allrounder can learn skills assigned to any player class, but level-gated skills unlock at `ceil(baseUnlockLevel × 1.5)`.
+- Shadow Step is a specific use restriction: even if Allrounder learns it at the scaled level, only Shadow Rogue can activate it.
 - Its five creation points must be allocated to STR, DEX, INT, and CON before a run starts; those choices are recorded and cannot be changed during that run.
 - Allrounder can equip every catalogued weapon family. Other classes use their explicit class weapon-family lists.
 - Allrounder earns 2% less XP until earning the final-dungeon title, then the penalty is permanently cleared for that run.
 
-**Why:** The user defined Allrounder as a flexible class whose broad access is balanced by slower learning, mandatory stat allocation, and a temporary XP penalty.
+**Why:** The user defined Allrounder as a flexible class whose broad access is balanced by slower learning, mandatory stat allocation, and a temporary XP penalty, and separately restricted Shadow Step to Shadow Rogue.
 
-**How to apply:** Keep the same Allrounder rules in class creation, skill unlock calculations, equip validation, XP awards, and title/reward handling.
+**How to apply:** Keep the same Allrounder rules in class creation, skill unlock calculations, equip validation, XP awards, and title/reward handling; enforce Shadow Step's Rogue-only use at the activation boundary.
 
 ## Starter Gear IDs (per class)
 

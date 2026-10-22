@@ -158,7 +158,14 @@ export function HUD({ onOpenInventory }: { onOpenInventory: () => void }) {
   const playerMp = useGameStore((s) => s.playerMp);
   const dungeon = useGameStore((s) => s.dungeon);
   const companion = useGameStore((s) => s.companion);
+  const mode = useGameStore((s) => s.mode);
+  const useExplorationSkill = useGameStore((s) => s.useExplorationSkill);
   const stats = getPlayerEffectiveStats(player);
+  const shadowStepCost = SKILLS.shadowStep?.mpCost ?? 20;
+  const canUseShadowStep =
+    mode === 'exploring' &&
+    player.heroClass === 'rogue' &&
+    player.skillIds.includes('shadowStep');
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col gap-2 p-3 sm:p-4">
@@ -209,13 +216,26 @@ export function HUD({ onOpenInventory }: { onOpenInventory: () => void }) {
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={onOpenInventory}
-          className="pointer-events-auto flex items-center gap-1.5 rounded-md border border-primary-border bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover-elevate active-elevate-2"
-        >
-          <Backpack size={14} /> Inventory
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {canUseShadowStep && (
+            <button
+              type="button"
+              disabled={playerMp < shadowStepCost}
+              onClick={() => useExplorationSkill('shadowStep')}
+              title="Teleport three tiles in your facing direction. Traps can be crossed without triggering them."
+              className="pointer-events-auto flex items-center gap-1.5 rounded-md border border-violet-400/40 bg-violet-500/20 px-3 py-1.5 text-xs font-semibold text-violet-100 hover:bg-violet-500/30 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Wind size={14} /> Shadow Step · {shadowStepCost} MP
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onOpenInventory}
+            className="pointer-events-auto flex items-center gap-1.5 rounded-md border border-primary-border bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover-elevate active-elevate-2"
+          >
+            <Backpack size={14} /> Inventory
+          </button>
+        </div>
       </div>
     </div>
   );

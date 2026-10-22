@@ -50,9 +50,11 @@ export interface Skill {
   healAmount?: number;
   /** If set, heals this fraction of the player's max HP (e.g. 0.4 = 40%). */
   healPercent?: number;
+  /** Can be activated from exploration rather than during turn-based battle. */
+  fieldOnly?: boolean;
   /** If true, this physical skill always deals a critical hit (e.g. Shadow Strike). */
   guaranteedCrit?: boolean;
-  /** If true, using this skill in battle guarantees a successful escape (e.g. Shadow Step). */
+  /** If true, using this skill in battle guarantees a successful escape. */
   guaranteedFlee?: boolean;
 }
 
