@@ -2,3 +2,4 @@
 - [Equipment instance identity](game-equipment-instance-identity.md) — clone-with-fresh-id every equipment entry point (loot, crafting, starting gear), not just the main loot path.
 - [Terrain hazard system](terrain-hazard-system.md) — terrain timers live in Zustand store, ticked by useTerrainTick (1 s interval, paused during battle). EnemyMarkers must use per-instance useFrame lerp for smooth movement.
 - [Hero class system](hero-class-system.md) — Allrounder can learn every class skill at 1.5× unlock levels; keep its creation-point, weapon, and title rules consistent across UI and store.
+- [Dungeon campaign progression](dungeon-campaign-progression.md) — the run lasts ten floors, with the companion rescue after Floor 5.
