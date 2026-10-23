@@ -28,6 +28,8 @@ const DEFAULT_NAMES: Record<string, string> = {
   male:   'Rohit',
   female: 'Khushi',
 };
+const MAX_HERO_NAME_LENGTH = 15;
+const INVALID_HERO_NAME_CHARACTERS = /[^\p{L} '’-]/u;
 
 /* ── Shared backdrop card ──────────────────────────────────────────────────── */
 function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
@@ -370,6 +372,17 @@ function GenderScreen({
   useEffect(() => { inputRef.current?.focus(); }, []);
 
   const cls = CLASS_LIST.find((c) => c.id === selectedClass);
+  const trimmedName = name.trim();
+  const hasInvalidCharacters = INVALID_HERO_NAME_CHARACTERS.test(name);
+  const exceedsMaxLength = name.length > MAX_HERO_NAME_LENGTH;
+  const nameError = hasInvalidCharacters
+    ? 'Name contains invalid characters'
+    : exceedsMaxLength
+      ? `Name cannot exceed ${MAX_HERO_NAME_LENGTH} characters`
+      : !trimmedName
+        ? 'Name cannot be empty'
+        : null;
+  const canStart = !nameError;
 
   return (
     <Card className="max-w-xs">
@@ -421,29 +434,49 @@ function GenderScreen({
         <label htmlFor="hero-name" className="text-xs font-bold uppercase tracking-widest text-white/50">
           Hero Name
         </label>
-        <input
-          id="hero-name"
-          ref={inputRef}
-          type="text"
-          value={name}
-          maxLength={20}
-          onChange={(e) => onName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) onStart(); }}
-          className="rounded-lg border border-white/20 bg-white/8 px-3 py-2.5 text-sm font-semibold text-white placeholder-white/30 outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
-          placeholder="Enter your name…"
-          style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
-        />
+        <div className="flex items-center gap-2">
+          <input
+            id="hero-name"
+            ref={inputRef}
+            type="text"
+            value={name}
+            maxLength={MAX_HERO_NAME_LENGTH}
+            aria-invalid={Boolean(nameError)}
+            aria-describedby={nameError ? 'hero-name-error' : undefined}
+            onChange={(e) => onName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && canStart) onStart(); }}
+            className={`min-w-0 flex-1 rounded-lg border bg-white/8 px-3 py-2.5 text-sm font-semibold text-white placeholder-white/30 outline-none focus:ring-1 ${
+              nameError
+                ? 'border-red-400/70 focus:border-red-400 focus:ring-red-400/30'
+                : 'border-white/20 focus:border-primary focus:ring-primary/30'
+            }`}
+            placeholder="Enter your name…"
+            style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
+          />
+          <button
+            type="button"
+            onClick={() => onName(DEFAULT_NAMES[gender])}
+            className="shrink-0 rounded-lg border border-white/20 px-2 py-2.5 text-[10px] font-semibold text-white/75 transition-colors hover:border-primary/60 hover:bg-white/10 hover:text-white"
+          >
+            Reset to default
+          </button>
+        </div>
+        {nameError && (
+          <p id="hero-name-error" role="alert" className="text-xs text-red-300">
+            {nameError}
+          </p>
+        )}
       </div>
 
       {/* Buttons */}
       <div className="flex flex-col gap-2">
         <button
           type="button"
-          disabled={!name.trim()}
+          disabled={!canStart}
           onClick={onStart}
           className="flex items-center justify-center gap-2 rounded-xl border-2 border-primary/80 bg-primary px-4 py-3 font-serif text-sm font-bold uppercase tracking-widest text-black shadow-[0_0_20px_rgba(244,195,86,0.35)] hover:scale-[1.02] active:scale-[0.98] transition-transform disabled:opacity-40"
         >
-          Enter the Dungeon
+          Begin Adventure as {trimmedName || '…'}
         </button>
         <button
           type="button"
@@ -468,9 +501,15 @@ export function TitleScreen() {
   const [allocatedStats, setAllocatedStats] = useState<ClassAttributes>({ ...EMPTY_ALLOCATION });
 
   function handleStart() {
-    if (!name.trim() || !selectedClass) return;
+    const trimmedName = name.trim();
+    if (
+      !trimmedName
+      || name.length > MAX_HERO_NAME_LENGTH
+      || INVALID_HERO_NAME_CHARACTERS.test(name)
+      || !selectedClass
+    ) return;
     startNewGame(
-      name.trim(),
+      trimmedName,
       gender,
       selectedClass,
       selectedClass === 'allrounder' ? allocatedStats : undefined,
