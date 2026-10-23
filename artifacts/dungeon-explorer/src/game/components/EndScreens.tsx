@@ -31,9 +31,9 @@ export function VictoryScreen() {
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-5 bg-background px-4 text-center">
       <Crown size={48} className="text-primary" />
-      <h1 className="font-serif text-4xl font-bold text-primary">Depths Conquered!</h1>
+      <h1 className="font-serif text-4xl font-bold text-primary">Dungeon of Trials Cleared!</h1>
       <p className="text-sm text-muted-foreground">
-        {player.name} cleared all ten floors at level {player.level} with {player.gold} gold.
+        {player.name} cleared all ten floors of Dungeon of Trials at level {player.level} with {player.gold} gold.
       </p>
       {player.title && (
         <p className="font-serif text-sm font-semibold text-primary">

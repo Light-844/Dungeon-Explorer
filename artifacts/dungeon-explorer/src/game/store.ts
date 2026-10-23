@@ -532,7 +532,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       dungeon,
       playerPos: { ...dungeon.startPos },
       battle: null,
-      message: `Floor 1 — ${dungeon.theme.name}`,
+      message: 'Dungeon of Trials - Floor 1',
       messageTone: 'info',
       terrainTimerSeconds: themeHasHazard(dungeon.theme.id) ? calcTerrainTimer(def) : null,
       terrainDamaging: false,
@@ -962,7 +962,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       companion: nextCompanion,
       playerPos: { ...nextDungeon.startPos },
       playerHp: Math.min(get().playerHp + Math.round(stats.maxHp * 0.15), stats.maxHp),
-      message: `Floor ${nextFloor} — ${nextDungeon.theme.name}`,
+      message: `Dungeon of Trials - Floor ${nextFloor}`,
       messageTone: 'info',
       // Reset terrain state for the new floor
       terrainTimerSeconds: themeHasHazard(nextDungeon.theme.id)

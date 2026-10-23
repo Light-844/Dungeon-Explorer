@@ -211,7 +211,7 @@ export function HUD({ onOpenInventory }: { onOpenInventory: () => void }) {
           )}
           {dungeon && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Swords size={12} /> Floor {dungeon.floor} — {dungeon.theme.name}
+              <Swords size={12} /> Dungeon of Trials - Floor {dungeon.floor}/10
             </div>
           )}
         </div>
