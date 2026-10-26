@@ -86,8 +86,11 @@ export function pickEnemyAction(enemy: EnemyInstance): EnemyAction {
   return { type: 'attack' };
 }
 
+export const MAX_CHARACTER_LEVEL = 20;
+
 export function xpToNextLevel(level: number): number {
-  return Math.round(28 * Math.pow(level, 1.45));
+  const boundedLevel = Math.max(1, Math.min(MAX_CHARACTER_LEVEL, Math.floor(level)));
+  return boundedLevel * 50;
 }
 
 /**

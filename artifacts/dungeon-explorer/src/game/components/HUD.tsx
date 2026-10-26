@@ -136,6 +136,23 @@ function CompanionPartyCard({ companion }: { companion: CompanionCharacter }) {
             colorClass="bg-secondary"
             icon={<Sparkles size={12} />}
           />
+          <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+            <span>XP</span>
+            <span>{companion.xp}/{companion.xpToNext}</span>
+          </div>
+          <div
+            role="progressbar"
+            aria-label={`${companion.name} experience`}
+            aria-valuenow={companion.xp}
+            aria-valuemin={0}
+            aria-valuemax={companion.xpToNext}
+            className="h-1 overflow-hidden rounded-full bg-black/40"
+          >
+            <div
+              className="h-full bg-primary transition-all"
+              style={{ width: `${Math.min(100, (companion.xp / Math.max(1, companion.xpToNext)) * 100)}%` }}
+            />
+          </div>
           <div className="border-t border-white/10 pt-1.5 text-[10px] leading-relaxed text-muted-foreground">
             Attributes: STR {companion.classAttributes.str} · DEX {companion.classAttributes.dex} · INT {companion.classAttributes.int} · CON {companion.classAttributes.con}
             <br />

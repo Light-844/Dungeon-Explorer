@@ -12,6 +12,7 @@ export function BattleOverlay() {
   const playerHp = useGameStore((s) => s.playerHp);
   const playerMp = useGameStore((s) => s.playerMp);
   const battleAction = useGameStore((s) => s.battleAction);
+  const finishVictoryBattle = useGameStore((s) => s.finishVictoryBattle);
   const [panel, setPanel] = useState<Panel>('root');
   const [targetIndex, setTargetIndex] = useState(0);
   const [companionAction, setCompanionAction] = useState<CompanionBattleAction | null>(null);
@@ -26,6 +27,40 @@ export function BattleOverlay() {
   }, [battle, targetIndex]);
 
   if (!battle) return null;
+  if (battle.victory) {
+    return (
+      <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
+        <div className="w-full max-w-lg rounded-2xl border border-primary/40 bg-card/95 p-5 shadow-2xl sm:p-7">
+          <h2 className="mb-1 text-center font-serif text-2xl font-bold text-primary">Victory!</h2>
+          <p className="mb-4 text-center text-xs text-muted-foreground">
+            Your companion reached a new level. Battle results are in the combat log.
+          </p>
+          <div
+            role="log"
+            aria-label="Combat log"
+            aria-live="polite"
+            className="mb-4 max-h-44 overflow-y-auto rounded-lg border border-card-border bg-background/70 px-3 py-2 text-xs"
+          >
+            {battle.log.slice(-8).map((entry) => (
+              <div
+                key={entry.id}
+                className={entry.text.includes('reached Level') ? 'font-semibold text-secondary' : 'text-muted-foreground'}
+              >
+                {entry.text}
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={finishVictoryBattle}
+            className="w-full rounded-lg border border-primary/50 bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover-elevate active-elevate-2"
+          >
+            Continue Exploring
+          </button>
+        </div>
+      </div>
+    );
+  }
   const stats = getPlayerEffectiveStats(player);
   const skills = getAvailableSkills(player).filter((skill) => !skill.fieldOnly);
   const companionStats = companion ? getPlayerEffectiveStats(companion) : null;
@@ -39,7 +74,15 @@ export function BattleOverlay() {
     return first >= 0 ? first : 0;
   })();
 
-  function act(action: 'attack' | 'skill' | 'item' | 'defend' | 'flee', extra?: { skillId?: string; itemId?: string }) {
+  function act(
+    action: 'attack' | 'skill' | 'item' | 'defend' | 'flee',
+    extra?: {
+      skillId?: string;
+      itemId?: string;
+      itemSource?: 'player' | 'companion';
+      itemTarget?: 'player' | 'companion';
+    },
+  ) {
     battleAction(action, {
       ...extra,
       targetIndex: effectiveTarget,
@@ -215,20 +258,57 @@ export function BattleOverlay() {
         {panel === 'items' && (
           <div className="flex flex-col gap-2">
             <div className="grid max-h-40 grid-cols-1 gap-1.5 overflow-y-auto sm:grid-cols-2">
-              {player.inventory
-                .filter((s) => s.item.type !== 'key' && s.item.type !== 'material')
-                .map((stack) => (
-                  <button
-                    key={stack.item.id}
-                    type="button"
-                    onClick={() => act('item', { itemId: stack.item.id })}
-                    className="flex items-center justify-between rounded-md border border-card-border bg-card px-3 py-2 text-left text-xs hover-elevate active-elevate-2"
+              {[
+                ...player.inventory
+                  .filter((stack) => stack.item.type !== 'key' && stack.item.type !== 'material')
+                  .map((stack) => ({ stack, source: 'player' as const })),
+                ...(companion?.inventory
+                  .filter((stack) => stack.item.type === 'heal' && (!!stack.item.healAmount || !!stack.item.mpAmount))
+                  .map((stack) => ({ stack, source: 'companion' as const })) ?? []),
+              ].map(({ stack, source }) => {
+                const item = stack.item;
+                const isPotion = item.type === 'heal' && (!!item.healAmount || !!item.mpAmount);
+                return (
+                  <div
+                    key={`${source}:${item.id}`}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-card-border bg-card px-3 py-2 text-xs"
                   >
-                    <span className="font-medium text-foreground">{stack.item.name}</span>
-                    <span className="text-muted-foreground">x{stack.quantity}</span>
-                  </button>
-                ))}
-              {player.inventory.filter((s) => s.item.type !== 'key' && s.item.type !== 'material').length === 0 && (
+                    <span className="font-medium text-foreground">
+                      {item.name} <span className="text-muted-foreground">x{stack.quantity}</span>
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {source === 'player' && (
+                        <button
+                          type="button"
+                          onClick={() => act('item', {
+                            itemId: item.id,
+                            itemSource: 'player',
+                            itemTarget: 'player',
+                          })}
+                          className="rounded-md border border-primary/40 bg-primary/10 px-2 py-1 font-medium text-primary hover-elevate active-elevate-2"
+                        >
+                          Use
+                        </button>
+                      )}
+                      {isPotion && companion && (
+                        <button
+                          type="button"
+                          onClick={() => act('item', {
+                            itemId: item.id,
+                            itemSource: source,
+                            itemTarget: 'companion',
+                          })}
+                          className="rounded-md border border-secondary/40 bg-secondary/10 px-2 py-1 font-medium text-secondary hover-elevate active-elevate-2"
+                        >
+                          Use on {companion.name}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              {player.inventory.filter((s) => s.item.type !== 'key' && s.item.type !== 'material').length === 0 &&
+                !companion?.inventory.some((stack) => stack.item.type === 'heal' && (!!stack.item.healAmount || !!stack.item.mpAmount)) && (
                 <div className="text-xs text-muted-foreground">No usable items.</div>
               )}
             </div>

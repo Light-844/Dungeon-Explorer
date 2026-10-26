@@ -160,7 +160,7 @@ export default function GamePage() {
 
           {message && !isShopMessage && (
             <div
-              className={`pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-md border px-4 py-2 text-xs font-medium shadow-lg backdrop-blur sm:top-20 sm:text-sm ${
+              className={`pointer-events-none absolute left-1/2 top-16 z-40 -translate-x-1/2 rounded-md border px-4 py-2 text-xs font-medium shadow-lg backdrop-blur sm:top-20 sm:text-sm ${
                 messageTone === 'success'
                   ? 'border-chart-5/40 bg-chart-5/15 text-chart-5'
                   : messageTone === 'warning'

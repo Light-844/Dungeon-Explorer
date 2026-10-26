@@ -39,12 +39,20 @@ function buildMergeGroups(gear: Equipment[]): MergeGroup[] {
 
 export function InventoryModal({ onClose }: { onClose: () => void }) {
   const player = useGameStore((s) => s.player);
+  const companion = useGameStore((s) => s.companion);
   const useItem = useGameStore((s) => s.useItem);
   const equipItem = useGameStore((s) => s.equipItem);
   const unequipItem = useGameStore((s) => s.unequipItem);
+  const giveEquipmentToCompanion = useGameStore((s) => s.giveEquipmentToCompanion);
+  const giveEquippedEquipmentToCompanion = useGameStore((s) => s.giveEquippedEquipmentToCompanion);
+  const unequipCompanionItem = useGameStore((s) => s.unequipCompanionItem);
+  const giveItemToCompanion = useGameStore((s) => s.giveItemToCompanion);
+  const returnCompanionItem = useGameStore((s) => s.returnCompanionItem);
+  const useItemOnCompanion = useGameStore((s) => s.useItemOnCompanion);
   const allocateStatPoint = useGameStore((s) => s.allocateStatPoint);
   const mergeEquipment = useGameStore((s) => s.mergeEquipment);
   const stats = getPlayerEffectiveStats(player);
+  const companionStats = companion ? getPlayerEffectiveStats(companion) : null;
 
   const mergeGroups = buildMergeGroups(player.equipmentInventory);
 
@@ -176,13 +184,24 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
                   <div className="mb-1 flex items-center justify-between">
                     <span className="capitalize text-muted-foreground">{slot}</span>
                     {eq && (
-                      <button
-                        type="button"
-                        onClick={() => unequipItem(slot)}
-                        className="rounded-md border border-card-border bg-background/60 px-1.5 py-0.5 text-[10px] font-medium hover-elevate active-elevate-2"
-                      >
-                        Unequip
-                      </button>
+                      <div className="flex flex-wrap justify-end gap-1">
+                        {companion && (
+                          <button
+                            type="button"
+                            onClick={() => giveEquippedEquipmentToCompanion(slot)}
+                            className="rounded-md border border-secondary/40 bg-secondary/10 px-1.5 py-0.5 text-[10px] font-medium text-secondary hover-elevate active-elevate-2"
+                          >
+                            Give to {companion.name}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => unequipItem(slot)}
+                          className="rounded-md border border-card-border bg-background/60 px-1.5 py-0.5 text-[10px] font-medium hover-elevate active-elevate-2"
+                        >
+                          Unequip
+                        </button>
+                      </div>
                     )}
                   </div>
                   <div className="font-medium text-foreground">{eq ? equipmentDisplayName(eq) : 'None'}</div>
@@ -197,6 +216,100 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
+        {companion && companionStats && (
+          <section className="rounded-lg border border-secondary/30 bg-secondary/5 p-3">
+            <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 className="font-serif text-sm font-semibold text-foreground">
+                  {companion.name} · {CLASSES[companion.heroClass]?.name ?? companion.heroClass}
+                </h3>
+                <p className="text-[11px] text-muted-foreground">
+                  Level {companion.level} · XP {companion.xp}/{companion.xpToNext}
+                </p>
+              </div>
+              <div className="text-right text-[10px] text-muted-foreground">
+                HP {companionStats.maxHp} · MP {companionStats.maxMp}
+                <br />
+                ATK {companionStats.atk} · DEF {companionStats.def} · MATK {companionStats.matk}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {SLOTS.map((slot) => {
+                const eq = companion.equipment[slot];
+                return (
+                  <div key={slot} className="rounded-md border border-card-border bg-background/40 p-2.5 text-xs">
+                    <div className="mb-1 flex items-center justify-between gap-1">
+                      <span className="capitalize text-muted-foreground">{slot}</span>
+                      {eq && (
+                        <button
+                          type="button"
+                          onClick={() => unequipCompanionItem(slot)}
+                          className="rounded-md border border-card-border bg-background/60 px-1.5 py-0.5 text-[10px] font-medium hover-elevate active-elevate-2"
+                        >
+                          Unequip
+                        </button>
+                      )}
+                    </div>
+                    <div className="font-medium text-foreground">
+                      {eq ? equipmentDisplayName(eq) : 'None'}
+                    </div>
+                    {eq && (
+                      <div className="mt-1 text-muted-foreground">
+                        {Object.entries(eq.statBonus).map(([key, value]) => `${STAT_LABELS[key] ?? key} +${value}`).join(', ')}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-3 border-t border-white/10 pt-2">
+              <h4 className="mb-1.5 text-xs font-semibold text-foreground">Companion Items</h4>
+              {companion.inventory.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">No items carried by {companion.name}.</p>
+              ) : (
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  {companion.inventory.map((stack) => {
+                    const item = stack.item;
+                    const isPotion =
+                      item.type === 'heal' && (!!item.healAmount || !!item.mpAmount);
+                    return (
+                      <div
+                        key={item.id}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-card-border bg-background/40 px-3 py-2 text-xs"
+                      >
+                        <span className="font-medium text-foreground">
+                          {item.name} <span className="text-muted-foreground">x{stack.quantity}</span>
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {isPotion && (
+                            <button
+                              type="button"
+                              onClick={() => useItemOnCompanion(item.id, 'companion')}
+                              className="rounded-md border border-secondary/40 bg-secondary/10 px-2 py-1 font-medium text-secondary hover-elevate active-elevate-2"
+                            >
+                              Use on {companion.name}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => returnCompanionItem(item.id)}
+                            className="rounded-md border border-card-border bg-card px-2 py-1 font-medium text-muted-foreground hover-elevate active-elevate-2"
+                          >
+                            Return
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <p className="mt-1.5 text-[10px] text-muted-foreground">
+                Player and companion items use the same unlimited capacity.
+              </p>
+            </div>
+          </section>
+        )}
+
         {/* Spare gear + merge */}
         {player.equipmentInventory.length > 0 && (
           <div>
@@ -210,7 +323,7 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
                   {eq.slot === 'weapon' && !canClassEquipWeapon(player.heroClass, eq.weaponType) && (
                     <div className="sr-only">This weapon cannot be equipped by your class.</div>
                   )}
-                  <div>
+                  <div className="min-w-0">
                     <div className="font-medium capitalize text-foreground">
                       {equipmentDisplayName(eq)}{' '}
                       <span className="text-muted-foreground">({eq.slot})</span>
@@ -219,7 +332,8 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
                       {Object.entries(eq.statBonus).map(([k, v]) => `${STAT_LABELS[k] ?? k} +${v}`).join(', ')}
                     </div>
                   </div>
-                  {(() => {
+                  <div className="ml-2 flex shrink-0 flex-wrap justify-end gap-1.5">
+                    {(() => {
                     const classLocked = eq.slot === 'weapon' && !canClassEquipWeapon(player.heroClass, eq.weaponType);
                     return (
                       <button
@@ -232,7 +346,17 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
                         {classLocked ? 'Class locked' : 'Equip'}
                       </button>
                     );
-                  })()}
+                    })()}
+                    {companion && (
+                      <button
+                        type="button"
+                        onClick={() => giveEquipmentToCompanion(eq.instanceUid!)}
+                        className="rounded-md border border-secondary/40 bg-secondary/10 px-2 py-1 text-[10px] font-medium text-secondary hover-elevate active-elevate-2"
+                      >
+                        Give to {companion.name}
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -296,7 +420,7 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
                     </div>
                     <div className="text-muted-foreground truncate">{item.description}</div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2 pl-2">
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5 pl-2">
                     <span className="text-muted-foreground">x{stack.quantity}</span>
                     {usableOutsideBattle && (
                       <button
@@ -311,6 +435,24 @@ export function InventoryModal({ onClose }: { onClose: () => void }) {
                         }`}
                       >
                         {isBossCore ? 'Absorb' : isTerrainResist ? 'Apply' : 'Use'}
+                      </button>
+                    )}
+                    {companion && (
+                      <button
+                        type="button"
+                        onClick={() => giveItemToCompanion(item.id)}
+                        className="rounded-md border border-secondary/40 bg-secondary/10 px-2 py-1 text-[10px] font-medium text-secondary hover-elevate active-elevate-2"
+                      >
+                        Give to {companion.name}
+                      </button>
+                    )}
+                    {companion && item.type === 'heal' && (!!item.healAmount || !!item.mpAmount) && (
+                      <button
+                        type="button"
+                        onClick={() => useItemOnCompanion(item.id)}
+                        className="rounded-md border border-secondary/40 bg-secondary/10 px-2 py-1 text-[10px] font-medium text-secondary hover-elevate active-elevate-2"
+                      >
+                        Use on {companion.name}
                       </button>
                     )}
                   </div>
